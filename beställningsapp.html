@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beställningsapp</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+:root{
+  --bg:#0a0a0f;--panel:#14141f;--panel2:#1c1c2e;--border:#2a2a45;
+  --accent:#5b9bf8;--accent2:#8b6af8;--green:#27d67b;--orange:#f5a623;
+  --red:#e8445a;--text:#eeeef5;--muted:#7070a0;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --radius:14px;--radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;font-size:16px}
+
+/* ── SCREENS ── */
+.screen{display:none;flex:1;flex-direction:column;min-height:100vh}
+.screen.active{display:flex}
+
+/* ══════════════════════════════
+   START SCREEN
+══════════════════════════════ */
+#screen-start{background:var(--bg);align-items:stretch;padding:0}
+.start-inner{display:flex;flex-direction:column;flex:1;padding:32px 24px 40px}
+.start-logo{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.15em;color:var(--accent);margin-bottom:40px;text-align:center}
+.start-title{font-size:28px;font-weight:700;line-height:1.2;margin-bottom:6px}
+.start-sub{font-size:16px;color:var(--muted);margin-bottom:36px}
+
+.start-section-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+
+/* name input */
+.name-input{width:100%;background:var(--panel);border:2px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans);font-size:20px;font-weight:600;padding:16px 18px;outline:none;transition:border-color .2s;margin-bottom:28px}
+.name-input:focus{border-color:var(--accent)}
+.name-input::placeholder{color:var(--muted)}
+
+/* supplier buttons */
+.supplier-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:auto}
+.supplier-btn{background:var(--panel);border:2px solid var(--border);border-radius:var(--radius);padding:20px 22px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .2s;text-align:left}
+.supplier-btn:active{transform:scale(.98)}
+.supplier-btn.selected{border-color:var(--accent);background:rgba(91,155,248,.1)}
+.supplier-icon{width:48px;height:48px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.supplier-info{flex:1}
+.supplier-name{font-size:18px;font-weight:700;margin-bottom:2px}
+.supplier-count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.supplier-check{font-size:22px;color:var(--accent);opacity:0;transition:opacity .2s}
+.supplier-btn.selected .supplier-check{opacity:1}
+
+.start-cta{margin-top:28px;width:100%;padding:18px;background:var(--accent);border:none;border-radius:var(--radius);color:#fff;font-family:var(--sans);font-size:18px;font-weight:700;cursor:pointer;transition:opacity .15s;letter-spacing:.02em}
+.start-cta:active{opacity:.85}
+.start-cta:disabled{opacity:.35;cursor:default}
+
+/* ══════════════════════════════
+   MAIN APP
+══════════════════════════════ */
+#screen-app{overflow:hidden}
+
+/* header */
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.header-left{flex:1;min-width:0}
+.header-title{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-sub{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-back{background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--mono);font-size:12px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+.header-back:active{background:var(--panel2)}
+
+/* tabs */
+.tab-bar{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 12px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:var(--mono);font-size:12px;font-weight:700;padding:12px 10px;cursor:pointer;white-space:nowrap;transition:all .15s;letter-spacing:.05em}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* views */
+.view{display:none;flex:1;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.view.active{display:flex}
+
+/* ── SCAN VIEW ── */
+.scan-inner{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+#freight-banner{background:linear-gradient(135deg,#0d2e1a,#0a2012);border:2px solid var(--green);border-radius:var(--radius);padding:16px;display:none;align-items:center;gap:14px}
+#freight-banner.visible{display:flex}
+.freight-icon{font-size:30px}
+.freight-text strong{color:var(--green);font-size:18px;font-weight:700;display:block}
+.freight-text span{font-size:14px;color:var(--muted)}
+
+.progress-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.progress-labels{display:flex;justify-content:space-between;margin-bottom:10px}
+.progress-labels span:first-child{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.progress-labels span:last-child{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text)}
+.progress-track{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:4px;transition:width .4s ease}
+.progress-fill.done{background:linear-gradient(90deg,#1a7a3a,var(--green))}
+
+.scanner-box{position:relative;background:var(--panel);border:2px solid var(--border);border-radius:var(--radius);overflow:hidden;height:220px;display:flex;align-items:center;justify-content:center}
+#interactive{position:absolute;inset:0}
+#interactive canvas,#interactive video{width:100%!important;height:100%!important;object-fit:cover;position:absolute;top:0;left:0}
+#interactive canvas.drawingBuffer{opacity:.3}
+#scan-placeholder{display:flex;flex-direction:column;align-items:center;gap:8px;z-index:1}
+#scan-placeholder span{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.scan-line{position:absolute;left:8%;right:8%;height:3px;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:scanline 2s ease-in-out infinite;display:none}
+@keyframes scanline{0%{top:15%}50%{top:82%}100%{top:15%}}
+.scan-corners{position:absolute;inset:12px;display:none}
+.scan-corners::before,.scan-corners::after,.scan-ci::before,.scan-ci::after{content:'';position:absolute;width:22px;height:22px;border-color:var(--accent);border-style:solid}
+.scan-corners::before{top:0;left:0;border-width:3px 0 0 3px}
+.scan-corners::after{top:0;right:0;border-width:3px 3px 0 0}
+.scan-ci::before{bottom:0;left:0;border-width:0 0 3px 3px}
+.scan-ci::after{bottom:0;right:0;border-width:0 3px 3px 0}
+.scanner-active .scan-line,.scanner-active .scan-corners{display:block}
+.scanner-active #scan-placeholder{display:none}
+
+#scan-btn{padding:18px;background:var(--accent);border:none;border-radius:var(--radius);color:#fff;font-family:var(--sans);font-size:18px;font-weight:700;cursor:pointer;letter-spacing:.02em}
+#scan-btn:active{opacity:.85}
+#scan-btn.scanning{background:var(--red)}
+
+.manual-section{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.section-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:10px}
+.input-row{display:flex;gap:10px}
+.input-row input{flex:1;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:16px;padding:13px 14px;outline:none;transition:border-color .15s}
+.input-row input:focus{border-color:var(--accent)}
+.input-row button{background:var(--panel2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;padding:13px 16px;cursor:pointer;white-space:nowrap}
+.input-row button:active{background:var(--accent);border-color:var(--accent)}
+
+/* product card */
+#product-card{background:var(--panel);border:2px solid var(--accent);border-radius:var(--radius);padding:16px;display:none;animation:fadeUp .2s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.product-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.product-title{font-size:18px;font-weight:700;line-height:1.3;flex:1;padding-right:10px}
+.product-nr{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;margin-top:3px}
+.product-price{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green);margin-bottom:16px}
+.qty-row{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.qty-label{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em}
+.qty-ctrl{display:flex;align-items:center;background:var(--bg);border:2px solid var(--border);border-radius:12px;overflow:hidden}
+.qty-ctrl button{background:none;border:none;color:var(--text);font-size:26px;width:52px;height:52px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:300}
+.qty-ctrl button:active{background:var(--border)}
+.qty-display{font-family:var(--mono);font-size:24px;font-weight:700;min-width:54px;text-align:center}
+.min-qty-hint{font-family:var(--mono);font-size:12px;color:var(--orange);background:rgba(245,166,35,.1);padding:4px 10px;border-radius:20px}
+#add-to-order{width:100%;padding:16px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--sans);font-size:18px;font-weight:700;cursor:pointer;letter-spacing:.02em}
+#add-to-order:active{opacity:.85}
+
+/* notification */
+#notification{position:fixed;bottom:24px;left:16px;right:16px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;padding:14px 18px;font-family:var(--sans);font-size:15px;font-weight:600;pointer-events:none;opacity:0;transition:opacity .3s;z-index:500;text-align:center}
+#notification.show{opacity:1}
+#notification.success{border-color:var(--green);color:var(--green)}
+#notification.warning{border-color:var(--orange);color:var(--orange)}
+#notification.info{border-color:var(--accent);color:var(--accent)}
+
+/* ── ORDER VIEW ── */
+.order-header{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center}
+.order-meta{display:flex;flex-direction:column;gap:3px}
+.order-meta-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+.order-meta-placer{font-size:16px;font-weight:700;color:var(--text)}
+.order-meta-supplier{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.order-total-h{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)}
+
+.order-list{padding:14px 16px;display:flex;flex-direction:column;gap:10px;padding-bottom:180px}
+.order-empty{text-align:center;color:var(--muted);font-size:16px;padding:60px 20px;line-height:1.6}
+
+.order-item{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
+.order-item-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px}
+.order-item-name{font-size:16px;font-weight:600;line-height:1.3;flex:1}
+.delete-btn{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0}
+.delete-btn:active{color:var(--red)}
+.order-item-bottom{display:flex;align-items:center;justify-content:space-between}
+.order-item-nr{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.order-item-qty{display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.order-item-qty button{background:none;border:none;color:var(--text);font-size:22px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.order-item-qty button:active{background:var(--border)}
+.order-qty-num{font-family:var(--mono);font-size:18px;font-weight:700;min-width:36px;text-align:center}
+.order-item-price{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--green)}
+
+.order-footer{background:var(--panel);border-top:2px solid var(--border);padding:16px;position:fixed;bottom:0;left:0;right:0;display:flex;flex-direction:column;gap:10px}
+.order-summary{display:flex;justify-content:space-between;align-items:center}
+.order-summary-label{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.order-summary-total{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--text)}
+.footer-btns{display:flex;gap:10px}
+#send-order{flex:2;padding:16px;background:var(--green);border:none;border-radius:var(--radius-sm);color:#000;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer}
+#send-order:active{opacity:.85}
+#clear-order{flex:1;padding:16px;background:none;border:2px solid var(--red);border-radius:var(--radius-sm);color:var(--red);font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer}
+#clear-order:active{background:rgba(232,68,90,.1)}
+
+/* ── HISTORY VIEW ── */
+.view-header{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:10}
+.view-header h2{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.1em;margin-bottom:10px}
+.search-input{width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:16px;padding:12px 14px;outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--accent)}
+
+.hist-list{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.hist-empty{text-align:center;color:var(--muted);font-size:16px;padding:60px 20px}
+.hist-item{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.hist-header{padding:16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.hist-header:active{background:var(--panel2)}
+.hist-placer{font-size:17px;font-weight:700;margin-bottom:3px}
+.hist-date{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hist-supplier-tag{display:inline-block;background:rgba(91,155,248,.15);color:var(--accent);font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:20px;margin-top:4px}
+.hist-right{text-align:right}
+.hist-total{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green)}
+.hist-count{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px}
+.hist-body{border-top:1px solid var(--border);padding:14px 16px;display:none;flex-direction:column;gap:8px}
+.hist-body.open{display:flex}
+.hist-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hist-row-name{font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-row-right{display:flex;gap:12px;align-items:center;flex-shrink:0}
+.hist-row-qty{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.hist-row-price{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green)}
+.hist-actions{display:flex;gap:10px;margin-top:6px;padding-top:10px;border-top:1px solid var(--border)}
+.hist-action-btn{flex:1;padding:12px;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;text-align:center}
+.btn-reload{background:rgba(91,155,248,.15);border:1px solid var(--accent);color:var(--accent)}
+.btn-delete{background:rgba(232,68,90,.1);border:1px solid var(--red);color:var(--red)}
+
+/* ── DB VIEW ── */
+.db-list{padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+.db-item{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer}
+.db-item:active{border-color:var(--accent)}
+.db-item-info{flex:1;min-width:0}
+.db-item-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.db-item-meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.db-item-min{font-family:var(--mono);font-size:11px;color:var(--orange);margin-top:2px}
+.db-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.db-item-price{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--green)}
+.edit-btn{background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:16px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.edit-btn:active{border-color:var(--accent);color:var(--accent)}
+
+/* ── MODAL ── */
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;display:none;align-items:flex-end;justify-content:center;padding:0}
+#modal-overlay.open{display:flex}
+.modal-box{background:var(--panel);border-top:2px solid var(--border);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-drag{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px}
+.modal-title{font-family:var(--mono);font-size:13px;color:var(--accent);margin-bottom:18px;letter-spacing:.05em}
+.modal-field{margin-bottom:14px}
+.modal-field label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px}
+.modal-field input{width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:18px;padding:13px 14px;outline:none}
+.modal-field input:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.modal-actions button{flex:1;padding:16px;border-radius:12px;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer}
+.btn-cancel{background:none;border:2px solid var(--border);color:var(--muted)}
+.btn-save{background:var(--accent);border:none;color:#fff}
+</style>
+</head>
+<body>
+
+<!-- ════ START SCREEN ════ -->
+<div class="screen active" id="screen-start">
+<div class="start-inner">
+  <div class="start-logo">BESTÄLLNINGSAPP</div>
+  <div class="start-title">Hej! 👋</div>
+  <div class="start-sub">Välj leverantör och ange ditt namn för att börja.</div>
+
+  <div class="start-section-label">LEVERANTÖR</div>
+  <div class="supplier-grid" id="supplier-grid"></div>
+
+  <div class="start-section-label" style="margin-top:28px">DITT NAMN</div>
+  <input class="name-input" type="text" id="user-name-input"
+         placeholder="Skriv ditt namn..."
+         maxlength="40"
+         onkeydown="if(event.key==='Enter')tryStart()"
+         oninput="checkStartReady()">
+
+  <button class="start-cta" id="start-cta" disabled onclick="tryStart()">BÖRJA BESTÄLLA →</button>
+</div>
+</div>
+
+<!-- ════ APP SCREEN ════ -->
+<div class="screen" id="screen-app">
+
+<header>
+  <div class="header-left">
+    <div class="header-title" id="header-title">BESTÄLLNING</div>
+    <div class="header-sub" id="header-sub"></div>
+  </div>
+  <button class="header-back" onclick="goBack()">⬅ Byt</button>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-scan" onclick="setTab('scan',this)">📷 SCANNA</button>
+  <button class="tab-btn" id="tab-order" onclick="setTab('order',this)">🛒 ORDER <span id="badge"></span></button>
+  <button class="tab-btn" id="tab-hist" onclick="setTab('hist',this)">📋 HISTORIK</button>
+  <button class="tab-btn" id="tab-db" onclick="setTab('db',this)">🗄 DATABAS</button>
+</div>
+
+<!-- SCAN -->
+<div class="view active" id="view-scan">
+<div class="scan-inner">
+  <div id="freight-banner">
+    <div class="freight-icon">🚚</div>
+    <div class="freight-text"><strong>FRAKTFRITT!</strong><span>Ordern överstiger 10 000 kr</span></div>
+  </div>
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-labels">
+      <span>FRAKTFRITT VID 10 000 KR</span>
+      <span id="progress-label">0,00 kr</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="scanner-box" id="scanner-box">
+    <div id="interactive"></div>
+    <div id="scan-placeholder">
+      <div style="font-size:48px">📷</div>
+      <span>Tryck för att aktivera kameran</span>
+    </div>
+    <div class="scan-corners"><div class="scan-ci"></div></div>
+    <div class="scan-line"></div>
+  </div>
+  <button id="scan-btn" onclick="toggleScanner()">📷 SCANNA STRECKKOD</button>
+  <div class="manual-section">
+    <span class="section-label">Manuell sökning</span>
+    <div class="input-row">
+      <input type="text" id="manual-input" placeholder="Streckkod eller art.nr" inputmode="numeric"
+             onkeydown="if(event.key==='Enter')manualLookup()">
+      <button onclick="manualLookup()">SÖK</button>
+    </div>
+  </div>
+  <div id="product-card">
+    <div class="product-header">
+      <div>
+        <div class="product-title" id="card-name"></div>
+        <div class="product-nr" id="card-nr"></div>
+      </div>
+    </div>
+    <div class="product-price" id="card-price"></div>
+    <div class="qty-row">
+      <span class="qty-label">ANTAL</span>
+      <div class="qty-ctrl">
+        <button onclick="changeQty(-1)">−</button>
+        <span class="qty-display" id="qty-display">1</span>
+        <button onclick="changeQty(1)">+</button>
+      </div>
+      <span class="min-qty-hint" id="min-qty-hint" style="display:none"></span>
+    </div>
+    <button id="add-to-order" onclick="addToOrder()">＋ LÄGG TILL I ORDER</button>
+  </div>
+</div>
+</div>
+
+<!-- ORDER -->
+<div class="view" id="view-order">
+  <div class="order-header">
+    <div class="order-meta">
+      <div class="order-meta-title">BESTÄLLARE</div>
+      <div class="order-meta-placer" id="order-placer"></div>
+      <div class="order-meta-supplier" id="order-supplier"></div>
+    </div>
+    <div class="order-total-h" id="order-total-h">0,00 kr</div>
+  </div>
+  <div class="order-list" id="order-list">
+    <div class="order-empty">Inga artiklar ännu.<br>Scanna för att börja!</div>
+  </div>
+  <div class="order-footer" id="order-footer" style="display:none">
+    <div class="order-summary">
+      <span class="order-summary-label">TOTALT (<span id="order-count">0</span> art.)</span>
+      <span class="order-summary-total" id="order-total-f">0,00 kr</span>
+    </div>
+    <div class="footer-btns">
+      <button id="send-order" onclick="sendOrder()">✓ SKICKA ORDER</button>
+      <button id="clear-order" onclick="clearOrder()">🗑 RENSA</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="view" id="view-hist">
+  <div class="view-header">
+    <h2>BESTÄLLNINGSHISTORIK</h2>
+    <input class="search-input" type="search" id="hist-search" placeholder="Sök namn, datum, leverantör..." oninput="renderHistory()">
+  </div>
+  <div class="hist-list" id="hist-list"></div>
+</div>
+
+<!-- DB -->
+<div class="view" id="view-db">
+  <div class="view-header">
+    <h2>DATABAS — <span id="db-supplier-label"></span></h2>
+    <input class="search-input" type="search" id="db-search" placeholder="Sök artikel..." oninput="renderDB()">
+  </div>
+  <div class="db-list" id="db-list"></div>
+</div>
+
+</div><!-- /screen-app -->
+
+<!-- EDIT MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-drag"></div>
+    <div class="modal-title">REDIGERA ARTIKEL</div>
+    <div class="modal-field"><label>Artikelnamn</label><input type="text" id="edit-name"></div>
+    <div class="modal-field"><label>Inköpspris (kr)</label><input type="number" id="edit-price" step="0.01" inputmode="decimal"></div>
+    <div class="modal-field"><label>Streckkod</label><input type="text" id="edit-barcode" inputmode="numeric"></div>
+    <div class="modal-field"><label>Minsta antal</label><input type="number" id="edit-min" min="1" step="1" inputmode="numeric"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">AVBRYT</button>
+      <button class="btn-save" onclick="saveEdit()">SPARA</button>
+    </div>
+  </div>
+</div>
+
+<div id="notification"></div>
+
+<script>
+// ═══════════════════════════════
+// DATA
+// ═══════════════════════════════
+const RAW = [{"a":"964638","n":"AquaFinish Vit S0500-N 10L","s":"7391484052467","p":1334.9,"k":"other","m":1,"l":"Caparol"},{"a":"964635","n":"AquaPrimer Blåtonad 10L","s":"7391484052443","p":1334.9,"k":"other","m":1,"l":"Caparol"},{"a":"964641","n":"AquaFinish Bas A 9,5L","s":"7391484052498","p":1221.17,"k":"other","m":1,"l":"Caparol"},{"a":"792741","n":"IsoSpärr Ultra 10 LT","s":"4002381802279","p":1184.12,"k":"other","m":1,"l":"Caparol"},{"a":"857737","n":"Nespri Fixx Vit 25 Lit","s":"4002381894984","p":1157.53,"k":"other","m":1,"l":"Caparol"},{"a":"964654","n":"AquaFinish Bas D 9L","s":"7391484052528","p":1156.92,"k":"other","m":1,"l":"Caparol"},{"a":"996960","n":"Latex Gloss 60 Bas 1 12,5 L","s":"4002382059801","p":1122.48,"k":"other","m":1,"l":"Caparol"},{"a":"923117","n":"IndekoGeo Bas 3 11,75 lit","s":"4002382002753","p":1010.09,"k":"other","m":1,"l":"Caparol"},{"a":"876318","n":"Tapetspärr 10L","s":"7391484027014","p":983.28,"k":"other","m":1,"l":"Caparol"},{"a":"923115","n":"IndekoGeo Bas 1 12,5 lit","s":"4002382002739","p":976.93,"k":"other","m":1,"l":"Caparol"},{"a":"923113","n":"IndekoGeo Vit 12,5 lit","s":"4002382002715","p":976.93,"k":"other","m":1,"l":"Caparol"},{"a":"885617","n":"Supertäck 20 PLUS Vit S0500-N 10 lit","s":"7391484029759","p":915.17,"k":"other","m":1,"l":"Caparol"},{"a":"885620","n":"Supertäck 20 PLUS Bas D 9 lit","s":"7391484029780","p":905.72,"k":"other","m":1,"l":"Caparol"},{"a":"885605","n":"Supertäck 7 PLUS Vit S0500-N 10 lit","s":"7391484029636","p":879.58,"k":"other","m":1,"l":"Caparol"},{"a":"975961","n":"Väggfärg Finest Wall Bas A 9,5L","s":"7391484025010","p":877.56,"k":"other","m":1,"l":"Caparol"},{"a":"885608","n":"Supertäck 7 PLUS Bas D 9 lit","s":"7391484029667","p":870.89,"k":"other","m":1,"l":"Caparol"},{"a":"885618","n":"Supertäck 20 PLUS Bas A 9,5 lit","s":"7391484029766","p":869.35,"k":"other","m":1,"l":"Caparol"},{"a":"885606","n":"Supertäck 7 PLUS Bas A 9,5 lit","s":"7391484029643","p":835.29,"k":"other","m":1,"l":"Caparol"},{"a":"975964","n":"Väggfärg Finest Wall Bas D 9L","s":"7391484025041","p":831.34,"k":"other","m":1,"l":"Caparol"},{"a":"751742","n":"Sylitol Bio Innefärg Vit/Bas 1 10 LT","s":"4002381771827","p":821.11,"k":"other","m":1,"l":"Caparol"},{"a":"977055","n":"Capasol Rapidgrund 10L","s":"4002382037694","p":704.21,"k":"other","m":1,"l":"Caparol"},{"a":"2016307","n":"Strong Wall 5 Vit S0500-N 10L","s":"7391484057356","p":698.31,"k":"other","m":1,"l":"Caparol"},{"a":"949655","n":"Capafree 5 Vit S0500-N 10 lit","s":"7391484051774","p":693.68,"k":"other","m":1,"l":"Caparol"},{"a":"934699","n":"Capafree 7 Bruten Vit 0502-Y 10 lit","s":"7391484051101","p":693.68,"k":"other","m":1,"l":"Caparol"},{"a":"931626","n":"Capafree 7 S0500-N Vit 10-lit","s":"7391484050937","p":693.68,"k":"other","m":1,"l":"Caparol"},{"a":"2016305","n":"Strong Wall 5 Bas 3 9L","s":"7391484057332","p":691.22,"k":"other","m":1,"l":"Caparol"},{"a":"2000889","n":"Capafree 5 Bas D 9L","s":"7391484054553","p":687.15,"k":"other","m":1,"l":"Caparol"},{"a":"998941","n":"Capafree 7 Bas D 9 L","s":"7391484032117","p":687.15,"k":"other","m":1,"l":"Caparol"},{"a":"2016313","n":"Strong Wall 7 Vit S0500-N 10L","s":"7391484057417","p":665.66,"k":"other","m":1,"l":"Caparol"},{"a":"2016303","n":"Strong Wall 5 Bas 1 9,5L","s":"7391484057318","p":663.82,"k":"other","m":1,"l":"Caparol"},{"a":"820417","n":"Supertäck 5 Nespri Vit/Bas 1 9,5 LT","s":"7391484019316","p":659.67,"k":"other","m":1,"l":"Caparol"},{"a":"2000886","n":"Capafree 5 Bas A 9,5 L","s":"7391484054522","p":659.48,"k":"other","m":1,"l":"Caparol"},{"a":"998938","n":"Capafree 7 Bas A 9,5 L","s":"7391484032087","p":659.48,"k":"other","m":1,"l":"Caparol"},{"a":"2016311","n":"Strong Wall 7 Bas 3 9L","s":"7391484057394","p":658.52,"k":"other","m":1,"l":"Caparol"},{"a":"403576","n":"Supertäck 20 Bruten Vit 0502-Y 10 lit","s":"7391484000154","p":639.95,"k":"other","m":1,"l":"Caparol"},{"a":"885290","n":"Supertäck 20 Vit S0500-N 10 lit","s":"7391484029377","p":639.95,"k":"other","m":1,"l":"Caparol"},{"a":"403575","n":"Supertäck 20 Bas D 9 LT","s":"7391484002929","p":633.59,"k":"other","m":1,"l":"Caparol"},{"a":"2016309","n":"Strong Wall 7 Bas 1 9,5L","s":"7391484057370","p":632.02,"k":"other","m":1,"l":"Caparol"},{"a":"403573","n":"Supertäck 20 Bas A 9,50 LT","s":"7391484002905","p":608.32,"k":"other","m":1,"l":"Caparol"},{"a":"923698","n":"Supertäck 5 Bruten Vit 0502-Y 10 lit","s":"7391484050470","p":607.22,"k":"other","m":1,"l":"Caparol"},{"a":"820565","n":"Supertäck 5 Varmvit S0502-Y 10 LT","s":"7391484019606","p":607.22,"k":"other","m":1,"l":"Caparol"},{"a":"885284","n":"Supertäck 5 Vit S0500-N 10 lit","s":"7391484029315","p":607.22,"k":"other","m":1,"l":"Caparol"},{"a":"892473","n":"Supertäck 5 Bas D 9 lit","s":"7391484030328","p":601.06,"k":"other","m":1,"l":"Caparol"},{"a":"403597","n":"Supertäck 7 Bruten Vit 0502-Y 10 lit","s":"7391484000123","p":578.83,"k":"other","m":1,"l":"Caparol"},{"a":"821978","n":"Supertäck 7 Varmvit S0502-Y 10 LT","s":"7391484020299","p":578.83,"k":"other","m":1,"l":"Caparol"},{"a":"885287","n":"Supertäck 7 Vit S0500-N 10 lit","s":"7391484029346","p":578.83,"k":"other","m":1,"l":"Caparol"},{"a":"892467","n":"Supertäck 5 Bas A 9,5 lit","s":"7391484030267","p":577.24,"k":"other","m":1,"l":"Caparol"},{"a":"403596","n":"Supertäck 7 Bas D 9 LT","s":"7391484002790","p":572.63,"k":"other","m":1,"l":"Caparol"},{"a":"992208","n":"Capafree 2 Vit 10 Lit","s":"7391484031868","p":565.59,"k":"other","m":1,"l":"Caparol"},{"a":"403594","n":"Supertäck 7 Bas A 9,50 LT","s":"7391484002776","p":549.58,"k":"other","m":1,"l":"Caparol"},{"a":"802046","n":"CapaSilan WS 10 LT","s":"4002381806901","p":548.22,"k":"other","m":1,"l":"Caparol"},{"a":"959534","n":"Supertäck 2 Takvit S0500-N 10L","s":"7391484052153","p":494.86,"k":"other","m":1,"l":"Caparol"},{"a":"959533","n":"Supertäck 2 Vit 10L","s":"7391484052146","p":494.86,"k":"other","m":1,"l":"Caparol"},{"a":"857736","n":"Nespri Fixx Vit/Bas 1 10 Lit","s":"4002381894977","p":493.7,"k":"other","m":1,"l":"Caparol"},{"a":"403598","n":"Supertäck Grund Nespri-TEC Vit 10 LT","s":"7391484003063","p":480.11,"k":"other","m":1,"l":"Caparol"},{"a":"902375","n":"Sylitol Bio Innefärg Vit/ Bas 1 5 LT","s":"4002381909091","p":467.31,"k":"other","m":1,"l":"Caparol"},{"a":"919277","n":"Sylitol Bio Innefärg Bas 3 4,7 LT","s":"4002382002524","p":466.71,"k":"other","m":1,"l":"Caparol"},{"a":"881454","n":"Supertäck Grund Bas D 9-lit","s":"7391484028868","p":463.52,"k":"other","m":1,"l":"Caparol"},{"a":"923118","n":"IndekoGeo Bas 3 4,7 lit","s":"4002382002760","p":457.38,"k":"other","m":1,"l":"Caparol"},{"a":"923116","n":"IndekoGeo Bas 1 5 lit","s":"4002382002746","p":447.52,"k":"other","m":1,"l":"Caparol"},{"a":"923114","n":"IndekoGeo Vit 5 lit","s":"4002382002722","p":447.52,"k":"other","m":1,"l":"Caparol"},{"a":"1010591","n":"Pro Interior 7 Vit S0500-N 10L","s":"7391484032292","p":446.45,"k":"other","m":1,"l":"Caparol"},{"a":"964637","n":"AquaFinish Vit S0500-N 3L","s":"7391484052474","p":434.52,"k":"other","m":1,"l":"Caparol"},{"a":"964634","n":"AquaPrimer Blåtonad 3L","s":"7391484052450","p":434.52,"k":"other","m":1,"l":"Caparol"},{"a":"1010592","n":"Pro Interior 7 Bas A 9,5L","s":"7391484032308","p":424.12,"k":"other","m":1,"l":"Caparol"},{"a":"964640","n":"AquaFinish Bas A 2,85L","s":"7391484052481","p":398.7,"k":"other","m":1,"l":"Caparol"},{"a":"1010590","n":"Pro Interior 2 Takvit S0500-N 10L","s":"7391484032285","p":378.34,"k":"other","m":1,"l":"Caparol"},{"a":"1010589","n":"Pro Interior 2 Vit 10L","s":"7391484032278","p":378.34,"k":"other","m":1,"l":"Caparol"},{"a":"964653","n":"AquaFinish Bas D 2,7L","s":"7391484052511","p":377.73,"k":"other","m":1,"l":"Caparol"},{"a":"964899","n":"Grundfärg Häftprimer Bas T 2,4L","s":"4002382031197","p":346.63,"k":"other","m":1,"l":"Caparol"},{"a":"876317","n":"Tapetspärr 3L","s":"7391484027007","p":329.03,"k":"other","m":1,"l":"Caparol"},{"a":"834773","n":"IsoSpärr Ultra 2,5 LT","s":"4002381865946","p":324.41,"k":"other","m":1,"l":"Caparol"},{"a":"885613","n":"Supertäck 20 PLUS Vit S0500-N 3 lit","s":"7391484029711","p":308.59,"k":"other","m":1,"l":"Caparol"},{"a":"885616","n":"Supertäck 20 PLUS Bas D 2,7 lit","s":"7391484029742","p":302.36,"k":"other","m":1,"l":"Caparol"},{"a":"885601","n":"Supertäck 7 PLUS Vit S0500-N 3 lit","s":"7391484029599","p":297.93,"k":"other","m":1,"l":"Caparol"},{"a":"975960","n":"Väggfärg Finest Wall Bas A 2,85L","s":"7391484025003","p":295.61,"k":"other","m":1,"l":"Caparol"},{"a":"885614","n":"Supertäck 20 PLUS Bas A 2,85 lit","s":"7391484029728","p":293.15,"k":"other","m":1,"l":"Caparol"},{"a":"885604","n":"Supertäck 7 PLUS Bas D 2,7 lit","s":"7391484029629","p":291.91,"k":"other","m":1,"l":"Caparol"},{"a":"885602","n":"Supertäck 7 PLUS Bas A 2,85 lit","s":"7391484029605","p":282.94,"k":"other","m":1,"l":"Caparol"},{"a":"975963","n":"Väggfärg Finest Wall Bas D 2,7L","s":"7391484025034","p":280.05,"k":"other","m":1,"l":"Caparol"},{"a":"2016306","n":"Strong Wall 5 Vit S0500-N 3L","s":"7391484057349","p":248.65,"k":"other","m":1,"l":"Caparol"},{"a":"2016304","n":"Strong Wall 5 Bas 3 2,7L","s":"7391484057325","p":242.61,"k":"other","m":1,"l":"Caparol"},{"a":"949643","n":"Capafree 7 Bruten Vit 0502-Y 3 lit","s":"7391484051682","p":242.15,"k":"other","m":1,"l":"Caparol"},{"a":"949646","n":"Capafree 7 Vit S0500-N 3 lit","s":"7391484051705","p":242.15,"k":"other","m":1,"l":"Caparol"},{"a":"2016312","n":"Strong Wall 7 Vit S0500-N 3L","s":"7391484057400","p":238.85,"k":"other","m":1,"l":"Caparol"},{"a":"2000888","n":"Capafree 5 Bas D 2,7L","s":"7391484054546","p":236.79,"k":"other","m":1,"l":"Caparol"},{"a":"998940","n":"Capafree 7 Bas D 2,7 L","s":"7391484032100","p":236.79,"k":"other","m":1,"l":"Caparol"},{"a":"2016302","n":"Strong Wall 5 Bas 1 2,85L","s":"7391484057301","p":236.4,"k":"other","m":1,"l":"Caparol"},{"a":"2016310","n":"Strong Wall 7 Bas 3 2,7L","s":"7391484057387","p":232.8,"k":"other","m":1,"l":"Caparol"},{"a":"2000885","n":"Capafree 5 Bas A 2,85 L","s":"7391484054515","p":230.19,"k":"other","m":1,"l":"Caparol"},{"a":"998937","n":"Capafree 7 Bas A 2,85 L","s":"7391484032070","p":230.19,"k":"other","m":1,"l":"Caparol"},{"a":"2016308","n":"Strong Wall 7 Bas 1 2,85L","s":"7391484057363","p":226.81,"k":"other","m":1,"l":"Caparol"},{"a":"949654","n":"Capafree 5 Vit S0500-N 3 lit","s":"7391484051767","p":226.04,"k":"other","m":1,"l":"Caparol"},{"a":"885289","n":"Supertäck 20 Vit S0500-N 3 lit","s":"7391484029360","p":226.04,"k":"other","m":1,"l":"Caparol"},{"a":"528217","n":"Supertäck 20 Bas D 2,70 lit","s":"7391484026048","p":220.73,"k":"other","m":1,"l":"Caparol"},{"a":"885283","n":"Supertäck 5 Vit S0500-N 3 lit","s":"7391484029308","p":216.22,"k":"other","m":1,"l":"Caparol"},{"a":"528215","n":"Supertäck 20 Bas A 2,85 lit","s":"7391484026024","p":214.85,"k":"other","m":1,"l":"Caparol"},{"a":"892472","n":"Supertäck 5 Bas D 2,7 lit","s":"7391484030311","p":210.96,"k":"other","m":1,"l":"Caparol"},{"a":"885286","n":"Supertäck 7 Vit S0500-N 3 lit","s":"7391484029339","p":207.7,"k":"other","m":1,"l":"Caparol"},{"a":"892466","n":"Supertäck 5 Bas A 2,85 lit","s":"7391484030250","p":205.52,"k":"other","m":1,"l":"Caparol"},{"a":"977056","n":"Capasol Rapidgrund 2,5L","s":"4002382037700","p":204.43,"k":"other","m":1,"l":"Caparol"},{"a":"992207","n":"Capafree 2 Vit 3 Lit","s":"7391484031851","p":203.72,"k":"other","m":1,"l":"Caparol"},{"a":"873499","n":"Supertäck 7 Bas D 2,7 lit","s":"7391484026932","p":202.43,"k":"other","m":1,"l":"Caparol"},{"a":"873497","n":"Supertäck 7 Bas A 2,85 lit","s":"7391484026918","p":197.22,"k":"other","m":1,"l":"Caparol"},{"a":"968095","n":"Supertäck 2 Vit 3L","s":"7391484052566","p":182.52,"k":"other","m":1,"l":"Caparol"},{"a":"881635","n":"Supertäck Grund Vit 3 lit","s":"7391484028875","p":178.08,"k":"other","m":1,"l":"Caparol"},{"a":"881453","n":"Supertäck Grund Bas D 2,7-lit","s":"7391484028851","p":169.7,"k":"other","m":1,"l":"Caparol"},{"a":"964636","n":"AquaFinish Vit S0500-N 1L","s":"7391484052436","p":156.19,"k":"1L","m":3,"l":"Caparol"},{"a":"964621","n":"AquaPrimer Blåtonad 1L","s":"7391484052429","p":156.19,"k":"1L","m":3,"l":"Caparol"},{"a":"964639","n":"AquaFinish Bas A 0,95L","s":"7391484052535","p":143.68,"k":"other","m":1,"l":"Caparol"},{"a":"964642","n":"AquaFinish Bas D 0,9L","s":"7391484052504","p":136.12,"k":"other","m":1,"l":"Caparol"},{"a":"1015070","n":"Grundfärg Häftprimer Bas T 700 ML","s":"4002382079397","p":123.78,"k":"other","m":1,"l":"Caparol"},{"a":"885609","n":"Supertäck 20 PLUS Vit S0500-N 1 lit","s":"7391484029674","p":114.21,"k":"1L","m":3,"l":"Caparol"},{"a":"885612","n":"Supertäck 20 PLUS Bas D 0,9 lit","s":"7391484029704","p":111.01,"k":"other","m":1,"l":"Caparol"},{"a":"885597","n":"Supertäck 7 PLUS Vit S0500-N 1 LT","s":"7391484029551","p":110.66,"k":"1L","m":3,"l":"Caparol"},{"a":"975959","n":"Väggfärg Finest Wall Bas A 0,95L","s":"7391484024990","p":109.32,"k":"other","m":1,"l":"Caparol"},{"a":"885610","n":"Supertäck 20 PLUS Bas A 0,95 lit","s":"7391484029681","p":108.5,"k":"other","m":1,"l":"Caparol"},{"a":"885600","n":"Supertäck 7 PLUS Bas D 0,9 lit","s":"7391484029582","p":107.51,"k":"other","m":1,"l":"Caparol"},{"a":"885598","n":"Supertäck 7 PLUS Bas A 0,95 lit","s":"7391484029568","p":105.1,"k":"other","m":1,"l":"Caparol"},{"a":"975962","n":"Väggfärg Finest Wall Bas D 0,9L","s":"7391484025027","p":103.57,"k":"other","m":1,"l":"Caparol"},{"a":"2000887","n":"Capafree 5 Bas D 0,9L","s":"7391484054539","p":99.36,"k":"other","m":1,"l":"Caparol"},{"a":"998939","n":"Capafree 7 Bas D 0,9 L","s":"7391484032094","p":99.36,"k":"other","m":1,"l":"Caparol"},{"a":"2000884","n":"Capafree 5 Bas A 0,95 L","s":"7391484054508","p":98.3,"k":"other","m":1,"l":"Caparol"},{"a":"998936","n":"Capafree 7 Bas A 0,95L","s":"7391484032063","p":98.3,"k":"other","m":1,"l":"Caparol"},{"a":"949641","n":"Capafree 7 Bruten Vit 0502-Y 1 lit","s":"7391484051675","p":92.06,"k":"1L","m":3,"l":"Caparol"},{"a":"949644","n":"Capafree 7 Vit S0500-N 1 lit","s":"7391484051699","p":92.06,"k":"1L","m":3,"l":"Caparol"},{"a":"949652","n":"Capafree 5 Vit S0500-N 1 lit","s":"7391484051750","p":90.39,"k":"1L","m":3,"l":"Caparol"},{"a":"885288","n":"Supertäck 20 Vit S0500-N 1 lit","s":"7391484029353","p":86.69,"k":"1L","m":3,"l":"Caparol"},{"a":"403567","n":"Supertäck 20 Bas D 0,90 LT","s":"7391484002844","p":83.79,"k":"other","m":1,"l":"Caparol"},{"a":"885252","n":"Supertäck 5 Vit S0500-N 1 lit","s":"7391484029292","p":83.43,"k":"1L","m":3,"l":"Caparol"},{"a":"403565","n":"Supertäck 20 Bas A 0,95 LT","s":"7391484002820","p":82.4,"k":"other","m":1,"l":"Caparol"},{"a":"885285","n":"Supertäck 7 Vit S0500-N 1 lit","s":"7391484029322","p":80.58,"k":"1L","m":3,"l":"Caparol"},{"a":"892471","n":"Supertäck 5 Bas D 0,9 lit","s":"7391484030304","p":80.53,"k":"other","m":1,"l":"Caparol"},{"a":"892465","n":"Supertäck 5 Bas A 0,95 lit","s":"7391484030243","p":79.29,"k":"other","m":1,"l":"Caparol"},{"a":"992206","n":"Capafree 2 Vit 1 Lit","s":"7391484031844","p":79.25,"k":"1L","m":3,"l":"Caparol"},{"a":"403587","n":"Supertäck 7 Bas D 0,90 LT","s":"7391484002714","p":77.7,"k":"other","m":1,"l":"Caparol"},{"a":"403585","n":"Supertäck 7 Bas A 0,95 LT","s":"7391484002691","p":76.52,"k":"other","m":1,"l":"Caparol"},{"a":"968094","n":"Supertäck 2 Vit 1L","s":"7391484052559","p":72.18,"k":"1L","m":3,"l":"Caparol"},{"a":"2000274","n":"Metallocryl Interiör Silver/Bas 0,7 L","s":"7391484054409","p":172.19,"k":"0.7L","m":6,"l":"Caparol"},{"a":"934865","n":"Glitterpigment Diamonds Silver 75G","s":"4002382013162","p":161.09,"k":"other","m":1,"l":"Caparol"},{"a":"946184","n":"Glitterpigment Diamonds Guld 75G","s":"4002382020603","p":146.41,"k":"other","m":1,"l":"Caparol"},{"a":"978352","n":"Wood Primer C Vit 10 LT","s":"7391484025324","p":834.62,"k":"other","m":1,"l":"Caparol"},{"a":"978349","n":"Metal Finish Svart 3 LT","s":"7391484025294","p":531.4,"k":"other","m":1,"l":"Caparol"},{"a":"978345","n":"Metal Finish Vit/Bas A 2,85 LT","s":"7391484025256","p":517.45,"k":"other","m":1,"l":"Caparol"},{"a":"978347","n":"Metal Finish Bas C 2,70 LT","s":"7391484025270","p":473.96,"k":"other","m":1,"l":"Caparol"},{"a":"1013228","n":"Super Finish 40 Bas 3 2,7L","s":"7391484032452","p":373.25,"k":"other","m":1,"l":"Caparol"},{"a":"1013226","n":"Super Finish 40 Bas 1 2,85L","s":"7391484032438","p":357.96,"k":"other","m":1,"l":"Caparol"},{"a":"912620","n":"PU-Gloss Bas T 2,4 L","s":"4002381920683","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"912619","n":"PU-Gloss Bas W 2,4 L","s":"4002381920676","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"999407","n":"PU-Matt Bas T 2,4 L","s":"4002382062047","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"999405","n":"PU-Matt Bas W 2,4 L","s":"4002382061705","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"912616","n":"PU-Satin Bas T 2,4 LT","s":"4002381920652","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"912615","n":"PU-Satin Bas W 2,4 LT","s":"4002381920645","p":331.79,"k":"other","m":1,"l":"Caparol"},{"a":"939532","n":"ISO-Trägrund 2,5 lit","s":"4002382015333","p":329.9,"k":"other","m":1,"l":"Caparol"},{"a":"978351","n":"Wood Primer C Vit 3 LT","s":"7391484025317","p":284.6,"k":"other","m":1,"l":"Caparol"},{"a":"869872","n":"Woodprimer Vit 3L","s":"7391484024549","p":253.64,"k":"other","m":1,"l":"Caparol"},{"a":"869883","n":"Woodprimer Bas D 2,7L","s":"7391484024556","p":251.21,"k":"other","m":1,"l":"Caparol"},{"a":"978348","n":"Metal Finish Svart 1 LT","s":"7391484025287","p":212.57,"k":"1L","m":3,"l":"Caparol"},{"a":"978344","n":"Metal Finish Vit/Bas A 0,95 LT","s":"7391484025249","p":195.5,"k":"other","m":1,"l":"Caparol"},{"a":"978346","n":"Metal Finish Bas C 0,9 LT","s":"7391484025263","p":170.86,"k":"other","m":1,"l":"Caparol"},{"a":"1013229","n":"Super Finish 40 Vit S0500-N 1L","s":"7391484032469","p":137.21,"k":"1L","m":3,"l":"Caparol"},{"a":"1013227","n":"Super Finish 40 Bas 3 0,9L","s":"7391484032445","p":134.74,"k":"other","m":1,"l":"Caparol"},{"a":"986235","n":"Kvistlack 0,5 lit","s":"7391484025645","p":130.71,"k":"other","m":1,"l":"Caparol"},{"a":"1013225","n":"Super Finish 40 Bas 1 0,95L","s":"7391484032421","p":130.21,"k":"other","m":1,"l":"Caparol"},{"a":"939530","n":"ISO-Trägrund 0,75 lit","s":"4002382015319","p":107.57,"k":"0.7L","m":6,"l":"Caparol"},{"a":"912622","n":"PU-Gloss Bas T 700 ml","s":"4002381920706","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"912621","n":"PU-Gloss Bas W 700 ml","s":"4002381920690","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"999406","n":"PU-Matt Bas T 700 ml","s":"4002382061866","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"999404","n":"PU-Matt Bas W 700 ml","s":"4002382061200","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"912618","n":"PU-Satin Bas T 700 ML","s":"4002381920669","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"912617","n":"PU-Satin Bas W 700 ML","s":"4002381943545","p":104.8,"k":"other","m":1,"l":"Caparol"},{"a":"978350","n":"Wood Primer C Vit 1 LT","s":"7391484025300","p":104.8,"k":"1L","m":3,"l":"Caparol"},{"a":"403715","n":"Woodprimer Vit 1L","s":"7391484005999","p":96.0,"k":"1L","m":3,"l":"Caparol"},{"a":"854800","n":"Woodprimer Bas D 0,9L","s":"7391484021050","p":94.05,"k":"other","m":1,"l":"Caparol"},{"a":"405671","n":"Woodprimer Vit 0,5 L","s":"7391484017831","p":59.46,"k":"other","m":1,"l":"Caparol"},{"a":"854799","n":"Woodprimer Bas D 0,45L","s":"7391484023719","p":57.34,"k":"other","m":1,"l":"Caparol"},{"a":"885302","n":"Panellack 10 Färglös 10 lit","s":"7391484029483","p":702.27,"k":"other","m":1,"l":"Caparol"},{"a":"885305","n":"Panellack 10 Vit-tonad 10 lit","s":"7391484029513","p":702.27,"k":"other","m":1,"l":"Caparol"},{"a":"545151","n":"Klarlack Blank 3 lit","s":"7391484032926","p":362.73,"k":"other","m":1,"l":"Caparol"},{"a":"545148","n":"Klarlack Halvblank 3 lit","s":"7391484032896","p":362.73,"k":"other","m":1,"l":"Caparol"},{"a":"545145","n":"Klarlack Matt 3 lit","s":"7391484032865","p":362.73,"k":"other","m":1,"l":"Caparol"},{"a":"998278","n":"Snickerilasyr Färglös 3 L","s":"7391484032056","p":254.34,"k":"other","m":1,"l":"Caparol"},{"a":"885301","n":"Panellack 10 Färglös 3 lit","s":"7391484029476","p":245.06,"k":"other","m":1,"l":"Caparol"},{"a":"885304","n":"Panellack 10 Vit-tonad 3 lit","s":"7391484029506","p":245.06,"k":"other","m":1,"l":"Caparol"},{"a":"978341","n":"Yacht Finish 1 LT","s":"7391484025218","p":167.98,"k":"1L","m":3,"l":"Caparol"},{"a":"545150","n":"Klarlack Blank 1 lit","s":"7391484032919","p":132.36,"k":"1L","m":3,"l":"Caparol"},{"a":"545147","n":"Klarlack Halvblank 1 lit","s":"7391484032889","p":132.36,"k":"1L","m":3,"l":"Caparol"},{"a":"545144","n":"Klarlack Matt 1 lit","s":"7391484032858","p":132.36,"k":"1L","m":3,"l":"Caparol"},{"a":"885300","n":"Panellack 10 Färglös 1 lit","s":"7391484029469","p":93.16,"k":"1L","m":3,"l":"Caparol"},{"a":"885303","n":"Panellack 10 Vit-tonad 1 lit","s":"7391484029490","p":93.16,"k":"1L","m":3,"l":"Caparol"},{"a":"545149","n":"Klarlack Blank 0,5 lit","s":"7391484032902","p":77.64,"k":"other","m":1,"l":"Caparol"},{"a":"545146","n":"Klarlack Halvblank 0,5 lit","s":"7391484032872","p":77.64,"k":"other","m":1,"l":"Caparol"},{"a":"545143","n":"Klarlack Matt 0,5 lit","s":"7391484032841","p":77.64,"k":"other","m":1,"l":"Caparol"},{"a":"936067","n":"Snickerilasyr Färglös 0,5-L","s":"7391484051200","p":53.84,"k":"other","m":1,"l":"Caparol"},{"a":"403745","n":"Betongimpregnering Färglös 10 LT","s":"7391484016186","p":683.81,"k":"other","m":1,"l":"Caparol"},{"a":"892603","n":"Unigrund Capalac Vit 10 LT","s":"4002381976895","p":1471.55,"k":"other","m":1,"l":"Caparol"},{"a":"1007069","n":"Protega Topcoat C  Clear matt 5kg","s":"7350003822196","p":923.4,"k":"other","m":1,"l":"Caparol"},{"a":"742218","n":"Unigrund Capalac Vit 2,50 LT","s":"4002381755223","p":396.54,"k":"other","m":1,"l":"Caparol"},{"a":"978343","n":"Metal Primer Grå 3 LT","s":"7391484025232","p":346.15,"k":"other","m":1,"l":"Caparol"},{"a":"742217","n":"Unigrund Capalac Vit 1 LT","s":"4002381755216","p":170.07,"k":"1L","m":3,"l":"Caparol"},{"a":"978342","n":"Metal Primer Grå 1 LT","s":"7391484025225","p":130.42,"k":"1L","m":3,"l":"Caparol"},{"a":"992040","n":"Fasad Primer Bas 3 9L","s":"7391484031837","p":1598.46,"k":"other","m":1,"l":"Caparol"},{"a":"2014788","n":"Intact Max Primer Bas 3 9L","s":"7391484056755","p":1598.46,"k":"other","m":1,"l":"Caparol"},{"a":"992039","n":"Fasad Primer Vit/Bas 1 9,5L","s":"7391484031820","p":1533.93,"k":"other","m":1,"l":"Caparol"},{"a":"2014785","n":"Intact Max Primer Vit/Bas 1 9,5L","s":"7391484056724","p":1533.93,"k":"other","m":1,"l":"Caparol"},{"a":"2014803","n":"Carat Original Vit/Bas 1 9,5L","s":"7391484056908","p":1533.13,"k":"other","m":1,"l":"Caparol"},{"a":"975953","n":"Fasadfärg Intact Matt Bas 3 9 L","s":"7391484024938","p":1393.07,"k":"other","m":1,"l":"Caparol"},{"a":"2014794","n":"Intact Max Matt Bas 3 9L","s":"7391484056816","p":1393.07,"k":"other","m":1,"l":"Caparol"},{"a":"975858","n":"Fasadfärg Intact Total Svart 10 L","s":"7391484024785","p":1346.54,"k":"other","m":1,"l":"Caparol"},{"a":"975950","n":"Fasadfärg Intact Matt Vit/Bas 1 9,5 L","s":"7391484024907","p":1336.75,"k":"other","m":1,"l":"Caparol"},{"a":"2014791","n":"Intact Max Matt Vit/Bas 1 9,5L","s":"7391484056786","p":1336.75,"k":"other","m":1,"l":"Caparol"},{"a":"992038","n":"Fasad Uteakrylat Bas 3 9L","s":"7391484031813","p":1333.08,"k":"other","m":1,"l":"Caparol"},{"a":"975944","n":"Fasadfärg Intact Total Bas 3 9 L","s":"7391484024846","p":1333.08,"k":"other","m":1,"l":"Caparol"},{"a":"2014800","n":"Intact Max Total Bas 3 9L","s":"7391484056878","p":1333.08,"k":"other","m":1,"l":"Caparol"},{"a":"978334","n":"Fasadgrund Vit 10 LT","s":"7391484025140","p":1317.64,"k":"other","m":1,"l":"Caparol"},{"a":"992037","n":"Fasad Uteakrylat Vit/Bas 1 9,5L","s":"7391484031806","p":1279.18,"k":"other","m":1,"l":"Caparol"},{"a":"975861","n":"Fasadfärg Intact Total Vit/Bas 1 9,5 L","s":"7391484024815","p":1279.18,"k":"other","m":1,"l":"Caparol"},{"a":"2014797","n":"Intact Max Total Vit/Bas 1 9,5L","s":"7391484056847","p":1279.18,"k":"other","m":1,"l":"Caparol"},{"a":"2014823","n":"Lasyr Fasad 9L","s":"7391484057103","p":1028.23,"k":"other","m":1,"l":"Caparol"},{"a":"2014817","n":"Solid Grundfärg Vit 10L","s":"7391484057042","p":972.91,"k":"other","m":1,"l":"Caparol"},{"a":"835506","n":"Fasadgrund LF Bas D 9 LT","s":"7391484021074","p":962.9,"k":"other","m":1,"l":"Caparol"},{"a":"978340","n":"Alkydoljefärg Bas C 2,70 LT","s":"7391484025201","p":546.48,"k":"other","m":1,"l":"Caparol"},{"a":"978338","n":"Alkydoljefärg Vit/ Bas A 2,85 LT","s":"7391484025188","p":528.85,"k":"other","m":1,"l":"Caparol"},{"a":"2014805","n":"Carat Original Bas 3 2,7L","s":"7391484056922","p":510.48,"k":"other","m":1,"l":"Caparol"},{"a":"2014787","n":"Intact Max Primer Bas 3 2,7L","s":"7391484056748","p":510.48,"k":"other","m":1,"l":"Caparol"},{"a":"912253","n":"Intact Primer Bas 3 2,7 lit","s":"7391484050098","p":510.48,"k":"other","m":1,"l":"Caparol"},{"a":"2014784","n":"Intact Max Primer Vit/Bas 1 2,85L","s":"7391484056717","p":492.84,"k":"other","m":1,"l":"Caparol"},{"a":"912245","n":"Intact Primer Vit/Bas 1 2,85 lit","s":"7391484050036","p":492.84,"k":"other","m":1,"l":"Caparol"},{"a":"2014802","n":"Carat Original Vit/Bas 1 2,85L","s":"7391484056892","p":492.6,"k":"other","m":1,"l":"Caparol"},{"a":"978333","n":"Fasadgrund Vit 3 LT","s":"7391484025133","p":461.24,"k":"other","m":1,"l":"Caparol"},{"a":"975946","n":"Fasadfärg Intact Matt Svart 3 L","s":"7391484024860","p":456.53,"k":"other","m":1,"l":"Caparol"},{"a":"975952","n":"Fasadfärg Intact Matt Bas 3 2,7 L","s":"7391484024921","p":448.87,"k":"other","m":1,"l":"Caparol"},{"a":"2014793","n":"Intact Max Matt Bas 3 2,7L","s":"7391484056809","p":448.87,"k":"other","m":1,"l":"Caparol"},{"a":"975857","n":"Fasadfärg Intact Total Svart 3 L","s":"7391484024778","p":438.34,"k":"other","m":1,"l":"Caparol"},{"a":"2014826","n":"Terrass Träolja 10L","s":"7391484057134","p":435.43,"k":"other","m":1,"l":"Caparol"},{"a":"975949","n":"Fasadfärg Intact Matt Vit/Bas 1 2,85 L","s":"7391484024891","p":433.68,"k":"other","m":1,"l":"Caparol"},{"a":"2014790","n":"Intact Max Matt Vit/Bas 1 2,85L","s":"7391484056779","p":433.68,"k":"other","m":1,"l":"Caparol"},{"a":"975943","n":"Fasadfärg Intact Total Bas 3 2,7 L","s":"7391484024839","p":430.87,"k":"other","m":1,"l":"Caparol"},{"a":"2014799","n":"Intact Max Total Bas 3 2,7L","s":"7391484056861","p":430.87,"k":"other","m":1,"l":"Caparol"},{"a":"975860","n":"Fasadfärg Intact Total Vit/Bas 1 2,85 L","s":"7391484024808","p":416.42,"k":"other","m":1,"l":"Caparol"},{"a":"2014796","n":"Intact Max Total Vit/Bas 1 2,85L","s":"7391484056830","p":416.42,"k":"other","m":1,"l":"Caparol"},{"a":"2014813","n":"Solid Fönster & Snickeri Bas 3 2,7L","s":"7391484057004","p":408.37,"k":"other","m":1,"l":"Caparol"},{"a":"2014811","n":"Solid Fönster & Snickeri Vit/Bas1 2,85L","s":"7391484056984","p":403.77,"k":"other","m":1,"l":"Caparol"},{"a":"1013230","n":"Super Finish 40 Vit S0500-N 3L","s":"7391484032476","p":377.24,"k":"other","m":1,"l":"Caparol"},{"a":"2014822","n":"Lasyr Fasad 2,7L","s":"7391484057097","p":339.42,"k":"other","m":1,"l":"Caparol"},{"a":"937304","n":"Lasyr Färglös 2,7 lit","s":"7391484051255","p":339.42,"k":"other","m":1,"l":"Caparol"},{"a":"528234","n":"Grundolja LF 3 lit","s":"7391484026192","p":328.24,"k":"other","m":1,"l":"Caparol"},{"a":"2014820","n":"Solid Grundolja 3L","s":"7391484057073","p":328.24,"k":"other","m":1,"l":"Caparol"},{"a":"528235","n":"Fasadgrund LF Vit 3 lit","s":"7391484026208","p":326.26,"k":"other","m":1,"l":"Caparol"},{"a":"2014816","n":"Solid Grundfärg Vit 3L","s":"7391484057035","p":326.26,"k":"other","m":1,"l":"Caparol"},{"a":"528236","n":"Fasadgrund LF Bas D 2,70 lit","s":"7391484026215","p":319.82,"k":"other","m":1,"l":"Caparol"},{"a":"978355","n":"Teak Färglös 3 LT","s":"7391484025355","p":307.98,"k":"other","m":1,"l":"Caparol"},{"a":"978339","n":"Alkydoljefärg Bas C 0,90 LT","s":"7391484025195","p":215.56,"k":"other","m":1,"l":"Caparol"},{"a":"978337","n":"Alkydoljefärg Vit/ Bas A 0,95 LT","s":"7391484025171","p":203.54,"k":"other","m":1,"l":"Caparol"},{"a":"978301","n":"Grundolja Färglös 1 LT","s":"7391484025119","p":199.69,"k":"1L","m":3,"l":"Caparol"},{"a":"978302","n":"Fasadgrund Vit 1 LT","s":"7391484025126","p":183.32,"k":"1L","m":3,"l":"Caparol"},{"a":"861247","n":"Carat Oljefärg Bas 3 0,9 lit","s":"7391484023924","p":180.47,"k":"other","m":1,"l":"Caparol"},{"a":"2014804","n":"Carat Original Bas 3 0,9L","s":"7391484056915","p":180.47,"k":"other","m":1,"l":"Caparol"},{"a":"2014786","n":"Intact Max Primer Bas 3 0,9L","s":"7391484056731","p":180.47,"k":"other","m":1,"l":"Caparol"},{"a":"912252","n":"Intact Primer Bas 3 0,9 lit","s":"7391484050081","p":180.47,"k":"other","m":1,"l":"Caparol"},{"a":"2014783","n":"Intact Max Primer Vit/Bas 1 0,95L","s":"7391484056700","p":175.17,"k":"other","m":1,"l":"Caparol"},{"a":"912244","n":"Intact Primer Vit/Bas 1 0,95 lit","s":"7391484050029","p":175.17,"k":"other","m":1,"l":"Caparol"},{"a":"861171","n":"Carat Oljefärg Vit/Bas 1 0,95 lit","s":"7391484023870","p":175.08,"k":"other","m":1,"l":"Caparol"},{"a":"2014801","n":"Carat Original Vit/Bas 1 0,95L","s":"7391484056885","p":175.08,"k":"other","m":1,"l":"Caparol"},{"a":"975945","n":"Fasadfärg Intact Matt Svart 1 L","s":"7391484024853","p":163.63,"k":"1L","m":3,"l":"Caparol"},{"a":"975951","n":"Fasadfärg Intact Matt Bas 3 0,9 L","s":"7391484024914","p":159.94,"k":"other","m":1,"l":"Caparol"},{"a":"2014792","n":"Intact Max Matt Bas 3 0,9L","s":"7391484056793","p":159.94,"k":"other","m":1,"l":"Caparol"},{"a":"975856","n":"Fasadfärg Intact Total Svart 1 L","s":"7391484024563","p":157.58,"k":"1L","m":3,"l":"Caparol"},{"a":"975948","n":"Fasadfärg Intact Matt Vit/Bas 1 0,95 L","s":"7391484024884","p":155.46,"k":"other","m":1,"l":"Caparol"},{"a":"2014789","n":"Intact Max Matt Vit/Bas 1 0,95L","s":"7391484056762","p":155.46,"k":"other","m":1,"l":"Caparol"},{"a":"975862","n":"Fasadfärg Intact Total Bas 3 0,9 L","s":"7391484024822","p":153.94,"k":"other","m":1,"l":"Caparol"},{"a":"2014798","n":"Intact Max Total Bas 3 0,9L","s":"7391484056854","p":153.94,"k":"other","m":1,"l":"Caparol"},{"a":"975859","n":"Fasadfärg Intact Total Vit/Bas 1 0,95 L","s":"7391484024792","p":149.69,"k":"other","m":1,"l":"Caparol"},{"a":"2014795","n":"Intact Max Total Vit/Bas 1 0,95L","s":"7391484056823","p":149.69,"k":"other","m":1,"l":"Caparol"},{"a":"1013579","n":"Intact Vision Bas 3 0,9L","s":"7391484032506","p":147.03,"k":"other","m":1,"l":"Caparol"},{"a":"2014812","n":"Solid Fönster & Snickeri Bas 3 0,9L","s":"7391484056991","p":147.03,"k":"other","m":1,"l":"Caparol"},{"a":"1013577","n":"Intact Vision Vit/Bas 1 0,95L","s":"7391484032483","p":146.14,"k":"other","m":1,"l":"Caparol"},{"a":"2014810","n":"Solid Fönster & Snickeri Vit/Bas1 0,95L","s":"7391484056977","p":146.14,"k":"other","m":1,"l":"Caparol"},{"a":"2014821","n":"Lasyr Fasad 0,9L","s":"7391484057080","p":123.45,"k":"other","m":1,"l":"Caparol"},{"a":"937303","n":"Lasyr Färglös 0,9 lit","s":"7391484051262","p":123.45,"k":"other","m":1,"l":"Caparol"},{"a":"403901","n":"Grundolja LF 1 LT","s":"7391484016728","p":120.88,"k":"1L","m":3,"l":"Caparol"},{"a":"2014819","n":"Solid Grundolja 1L","s":"7391484057066","p":120.88,"k":"1L","m":3,"l":"Caparol"},{"a":"403896","n":"Fasadgrund LF Vit 1 LT","s":"7391484016711","p":120.21,"k":"1L","m":3,"l":"Caparol"},{"a":"2014815","n":"Solid Grundfärg Vit 1L","s":"7391484057028","p":120.21,"k":"1L","m":3,"l":"Caparol"},{"a":"886315","n":"Fasadgrund LF Bas D 0,9 lit","s":"7391484029902","p":116.91,"k":"other","m":1,"l":"Caparol"},{"a":"2014825","n":"Terrass Träolja 3L","s":"7391484057127","p":114.45,"k":"other","m":1,"l":"Caparol"},{"a":"528262","n":"Terrassolja 3 lit","s":"7391484026475","p":114.45,"k":"other","m":1,"l":"Caparol"},{"a":"978354","n":"Teak Färglös 0,5 LT","s":"7391484025348","p":94.91,"k":"other","m":1,"l":"Caparol"},{"a":"2009035","n":"Fasadgrund LF Vit 0,5 lit","s":"7391484055208","p":87.84,"k":"other","m":1,"l":"Caparol"},{"a":"2014814","n":"Solid Grundfärg Vit 0,5L","s":"7391484057011","p":87.84,"k":"other","m":1,"l":"Caparol"},{"a":"881639","n":"Grundolja LF 0,5 lit","s":"7391484028912","p":71.9,"k":"other","m":1,"l":"Caparol"},{"a":"2014818","n":"Solid Grundolja 0,5L","s":"7391484057059","p":71.9,"k":"other","m":1,"l":"Caparol"},{"a":"2014824","n":"Terrass Träolja 1L","s":"7391484057110","p":67.91,"k":"1L","m":3,"l":"Caparol"},{"a":"403958","n":"Terrassolja 1 lit","s":"7391484017206","p":67.91,"k":"1L","m":3,"l":"Caparol"},{"a":"945030","n":"Fasadskydd 450 Disboxan 5L","s":"4002382020528","p":3525.25,"k":"other","m":1,"l":"Caparol"},{"a":"892023","n":"Disbocret 515 Nespri-TEC Vit 20 kg BC","s":"9002639206823","p":2020.89,"k":"other","m":1,"l":"Caparol"},{"a":"3220","n":"Disbocret 515 (CT) Vit 15 LT","s":"4002380311178","p":1989.81,"k":"other","m":1,"l":"Caparol"},{"a":"734193","n":"Disbocret 515 (CT) Bas 3 12 LT","s":"4002381730619","p":1931.74,"k":"other","m":1,"l":"Caparol"},{"a":"995314","n":"Fasadfärg ThermoSan Nespri VitBas1 12,5L","s":"4002382058774","p":1928.82,"k":"other","m":1,"l":"Caparol"},{"a":"3638","n":"Disbocret 518 Flex Finch 15 lit","s":"4002380376368","p":1914.86,"k":"other","m":1,"l":"Caparol"},{"a":"995315","n":"Fasadfärg ThermoSan Nespri Bas3 11,75L","s":"4002382058781","p":1913.04,"k":"other","m":1,"l":"Caparol"},{"a":"3639","n":"Disbocret 515  (CT) Bas 1 12 LT","s":"4002380376405","p":1699.48,"k":"other","m":1,"l":"Caparol"},{"a":"994887","n":"Fasad Putsfärg Vit/Bas 1 9,5L","s":"7391484031950","p":1411.88,"k":"other","m":1,"l":"Caparol"},{"a":"993906","n":"Fasadfärg Thermosan Vit/Bas 1 9,5L","s":"7391484031899","p":1411.88,"k":"other","m":1,"l":"Caparol"},{"a":"755693","n":"PermaSilan Vit 12,5 LT BV","s":"4002381774699","p":1396.33,"k":"other","m":1,"l":"Caparol"},{"a":"994888","n":"Fasad Putsfärg Bas 3 9,0L","s":"7391484031967","p":1343.61,"k":"other","m":1,"l":"Caparol"},{"a":"993909","n":"Fasadfärg ThermoSan Bas 3 9L","s":"7391484031929","p":1343.61,"k":"other","m":1,"l":"Caparol"},{"a":"755694","n":"Permasilan Bas 1 12,5 LT BV","s":"4002381774705","p":1342.58,"k":"other","m":1,"l":"Caparol"},{"a":"758707","n":"PermaSilan Bas 3 11,75 lit BV","s":"4002381775887","p":1262.04,"k":"other","m":1,"l":"Caparol"},{"a":"959786","n":"Minera Universal 22 kg","s":"4002382028005","p":1214.98,"k":"other","m":1,"l":"Caparol"},{"a":"741713","n":"Capamur Plus Bas 3 10 LT","s":"4002381754981","p":1197.18,"k":"other","m":1,"l":"Caparol"},{"a":"741722","n":"Sylitol Fasadfärg Vit/Bas 1 10 lit","s":"4002381755049","p":1145.12,"k":"other","m":1,"l":"Caparol"},{"a":"741698","n":"Capamur Plus Vit/Bas 1 10L","s":"4002381754943","p":1088.69,"k":"other","m":1,"l":"Caparol"},{"a":"780689","n":"Sylitol Fasadfärg Bas 3 9,4 LT","s":"4002381920287","p":1075.25,"k":"other","m":1,"l":"Caparol"},{"a":"983885","n":"Sylitol Koncentrat 111 Transparent 10L","s":"4002382043763","p":1014.67,"k":"other","m":1,"l":"Caparol"},{"a":"995295","n":"ThermoSan Djupgrund 10L","s":"4002382058538","p":869.15,"k":"other","m":1,"l":"Caparol"},{"a":"995313","n":"ThermoSan Häftgrund Vit 10L","s":"4002382058804","p":869.15,"k":"other","m":1,"l":"Caparol"},{"a":"1010487","n":"Histolith Fasadkalk 12,5 L","s":"4002382075146","p":816.68,"k":"other","m":1,"l":"Caparol"},{"a":"945029","n":"Fasadskydd 450 Disboxan 1L","s":"4002382020511","p":716.51,"k":"1L","m":3,"l":"Caparol"},{"a":"741717","n":"Sylitol Fasadfärg Vit/Bas 1 5 Lit","s":"4002381918109","p":628.42,"k":"other","m":1,"l":"Caparol"},{"a":"959787","n":"Minera Universal 8 kg","s":"4002382028012","p":619.84,"k":"other","m":1,"l":"Caparol"},{"a":"993905","n":"Fasadfärg ThermoSan Vit/Bas 1 2,85L","s":"7391484031882","p":456.23,"k":"other","m":1,"l":"Caparol"},{"a":"993908","n":"Fasadfärg ThermoSan Bas 3 2,7L","s":"7391484031912","p":434.03,"k":"other","m":1,"l":"Caparol"},{"a":"908322","n":"Sylitol Koncentrat 111 Transparent 3lit","s":"7391484033190","p":338.78,"k":"other","m":1,"l":"Caparol"},{"a":"741712","n":"Capamur Plus Bas 3 2,5 LT","s":"4002381754974","p":327.94,"k":"other","m":1,"l":"Caparol"},{"a":"741697","n":"Capamur Plus Vit/Bas 1 2,5L","s":"4002381754936","p":300.82,"k":"other","m":1,"l":"Caparol"},{"a":"992006","n":"ThermoSan Djupgrund 3L","s":"7391484031790","p":295.13,"k":"other","m":1,"l":"Caparol"},{"a":"993904","n":"Fasadfärg ThermoSan Vit/Bas 1 0,95L","s":"7391484031875","p":162.96,"k":"other","m":1,"l":"Caparol"},{"a":"993907","n":"Fasadfärg ThermoSan Bas 3 0,9L","s":"7391484031905","p":154.99,"k":"other","m":1,"l":"Caparol"},{"a":"992005","n":"ThermoSan Djupgrund 1L","s":"7391484031783","p":109.84,"k":"1L","m":3,"l":"Caparol"},{"a":"876069","n":"Grundfärg Haftprimer Vit 10LT","s":"4002381949165","p":1274.22,"k":"other","m":1,"l":"Caparol"},{"a":"831744","n":"Pansartäck Svart 10 LT","s":"7391484021630","p":1252.61,"k":"other","m":1,"l":"Caparol"},{"a":"838869","n":"Pansartäck Bas A 9,5 LT","s":"7391484022347","p":1189.81,"k":"other","m":1,"l":"Caparol"},{"a":"892353","n":"Pansartäck Bas B 9 lit","s":"7391484030229","p":1179.81,"k":"other","m":1,"l":"Caparol"},{"a":"873061","n":"Pansartäck Bas D 9 lit","s":"7391484026826","p":1179.81,"k":"other","m":1,"l":"Caparol"},{"a":"528264","n":"Pansarprimer Röd 3 LT","s":"7391484026499","p":493.98,"k":"other","m":1,"l":"Caparol"},{"a":"528272","n":"Pansartäck Svart 3 lit","s":"7391484026574","p":410.16,"k":"other","m":1,"l":"Caparol"},{"a":"528273","n":"Pansartäck Bas A 2,85 lit","s":"7391484026581","p":389.6,"k":"other","m":1,"l":"Caparol"},{"a":"892352","n":"Pansartäck Bas B 2,7 lit","s":"7391484030212","p":384.88,"k":"other","m":1,"l":"Caparol"},{"a":"873060","n":"Pansartäck Bas D 2,7 lit","s":"7391484026819","p":384.88,"k":"other","m":1,"l":"Caparol"},{"a":"876068","n":"Grundfärg Haftprimer Vit 2,5LT","s":"4002381949158","p":347.21,"k":"other","m":1,"l":"Caparol"},{"a":"831741","n":"Pansarprimer Röd 1 LT","s":"7391484021555","p":176.13,"k":"1L","m":3,"l":"Caparol"},{"a":"908320","n":"Pansartäck Svart 1 lit","s":"7391484033176","p":148.18,"k":"1L","m":3,"l":"Caparol"},{"a":"908317","n":"Pansartäck Bas A 0,95 lit","s":"7391484033145","p":140.76,"k":"other","m":1,"l":"Caparol"},{"a":"908318","n":"Pansartäck Bas B 0,9 lit","s":"7391484033152","p":138.61,"k":"other","m":1,"l":"Caparol"},{"a":"908319","n":"Pansartäck Bas D 0,9 lit","s":"7391484033169","p":138.61,"k":"other","m":1,"l":"Caparol"},{"a":"876067","n":"Grundfärg Haftprimer Vit 0,75LT","s":"4002381949141","p":112.76,"k":"0.7L","m":6,"l":"Caparol"},{"a":"847059","n":"Pansartäck Svart 0,5 LT","s":"7391484023290","p":85.55,"k":"other","m":1,"l":"Caparol"},{"a":"847058","n":"Pansartäck Bas A 0,475 LT","s":"7391484023306","p":81.26,"k":"other","m":1,"l":"Caparol"},{"a":"892351","n":"Pansartäck Bas B 0,45 lit","s":"7391484030205","p":79.62,"k":"other","m":1,"l":"Caparol"},{"a":"882177","n":"Pansartäck Bas D 0,45 lit","s":"7391484029155","p":79.62,"k":"other","m":1,"l":"Caparol"},{"a":"869365","n":"Metallfärg Maston, hamrad Silver 0,75lit","s":"6412490012496","p":228.46,"k":"0.7L","m":6,"l":"Caparol"},{"a":"857584","n":"Trafiklinjef Striper Pro Vit 0,75 LT BV","s":"7340057600277","p":214.02,"k":"0.7L","m":6,"l":"Caparol"},{"a":"873062","n":"Metallfärg Maston, hamrad Svart 0,75 lit","s":"6412490012120","p":209.68,"k":"0.7L","m":6,"l":"Caparol"},{"a":"813903","n":"Isoleringsspray Polyfilla 500 ml","s":"8710839369101","p":209.0,"k":"other","m":1,"l":"Caparol"},{"a":"878366","n":"Linjemarkeringsspray Vit 600 ml","s":"7315070116814","p":147.98,"k":"other","m":1,"l":"Caparol"},{"a":"934697","n":"Sprayfärg Hagmans Vit Element 400 ml","s":"7315070114933","p":126.55,"k":"other","m":1,"l":"Caparol"},{"a":"906278","n":"Rostskyddsgrund 1K Röd 400 ml spray","s":"7315070114445","p":115.3,"k":"other","m":1,"l":"Caparol"},{"a":"942266","n":"Isoleringsspray Polyfilla 250 ml","s":"8710839788001","p":114.86,"k":"other","m":1,"l":"Caparol"},{"a":"878376","n":"Sprayfärg +650 °C Svart 400ML","s":"7315070114971","p":98.68,"k":"other","m":1,"l":"Caparol"},{"a":"878368","n":"Sprayfärg Guld 400 ml","s":"7315070114919","p":96.83,"k":"other","m":1,"l":"Caparol"},{"a":"878367","n":"Sprayfärg Silver 400 ml","s":"7315070114926","p":85.21,"k":"other","m":1,"l":"Caparol"},{"a":"878369","n":"Sprayfärg Klarlack Blank 400 ml","s":"7315070114605","p":82.67,"k":"other","m":1,"l":"Caparol"},{"a":"878364","n":"Sprayfärg Ljusgrön RAL 6018 400 ml","s":"7315070114742","p":80.48,"k":"other","m":1,"l":"Caparol"},{"a":"878363","n":"Sprayfärg Grå Primer 400 ml","s":"7315070114407","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878371","n":"Sprayfärg Orange RAL 2004 400 ml","s":"7315070114711","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878373","n":"Sprayfärg Svart Blank 400 ml","s":"7315070114803","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878370","n":"Sprayfärg Svart Matt 400 ml","s":"7315070114902","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878374","n":"Sprayfärg Vit Blank 400 ml","s":"7315070114308","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878372","n":"Sprayfärg Vit Halvblank 400 ml","s":"7315070114315","p":76.69,"k":"other","m":1,"l":"Caparol"},{"a":"878375","n":"Sprayfärg Signalblå RAL 5005 400 ml","s":"7315070114285","p":74.32,"k":"other","m":1,"l":"Caparol"},{"a":"878365","n":"Sprayfärg Signalgul RAL 1003 400 ml","s":"7315070114261","p":74.32,"k":"other","m":1,"l":"Caparol"},{"a":"878262","n":"Sprayfärg Signalröd RAL 3001 400 ml","s":"7315070114278","p":74.32,"k":"other","m":1,"l":"Caparol"},{"a":"405512","n":"Tapetmaskin Tapofix CB70","s":"4014001021311","p":12375.35,"k":"other","m":1,"l":"Caparol"},{"a":"405505","n":"Tapetbord Tapo-Fix 2-del","s":"7392524000059","p":4356.69,"k":"other","m":1,"l":"Caparol"},{"a":"405241","n":"Tapetbord 3-del 60 x 85-95 cm","s":"7392524000028","p":3108.76,"k":"other","m":1,"l":"Caparol"},{"a":"405240","n":"Tapetbord 2-del 85 x 60 cm","s":"7391484014359","p":2518.99,"k":"other","m":1,"l":"Caparol"},{"a":"2014053","n":"Kompositremsa Straitflex Roll-patch30,5m","s":"0751361503760","p":1996.75,"k":"other","m":1,"l":"Caparol"},{"a":"405514","n":"LockTapo-Fix CB 70","s":"7319482074656","p":1572.7,"k":"other","m":1,"l":"Caparol"},{"a":"901297","n":"Strait-Flex WSR Rullverktyg","s":"0751361504330","p":1422.67,"k":"other","m":1,"l":"Caparol"},{"a":"901296","n":"Strait-Flex OSR Rullverktyg","s":"0751361504316","p":1422.16,"k":"other","m":1,"l":"Caparol"},{"a":"853769","n":"Habito Flex 83 30M","s":"0800805189302","p":1104.48,"k":"other","m":1,"l":"Caparol"},{"a":"901294","n":"Strait-Flex Wet-Flex 30,5 m","s":"0751361503500","p":613.06,"k":"other","m":1,"l":"Caparol"},{"a":"2014052","n":"Kompositremsa Straitflex Roll-patch6,2m","s":"0751361503746","p":461.48,"k":"other","m":1,"l":"Caparol"},{"a":"901292","n":"Strait-Flex Gold 30,5 m","s":"0751361503166","p":433.94,"k":"other","m":1,"l":"Caparol"},{"a":"901295","n":"Strait-Flex Arch-Flex 15,3 m","s":"0751361503401","p":382.82,"k":"other","m":1,"l":"Caparol"},{"a":"2009003","n":"Pappersremsa JOINT TAPE 150 M","s":"7391578424200","p":186.48,"k":"other","m":1,"l":"Caparol"},{"a":"1013978","n":"Borosan BAS","s":"7391484033480","p":176.87,"k":"other","m":1,"l":"Caparol"},{"a":"1013977","n":"Borosan HEM","s":"7391484033473","p":176.87,"k":"other","m":1,"l":"Caparol"},{"a":"934885","n":"Borosan Papper 17-21","s":"","p":139.24,"k":"other","m":1,"l":"Caparol"},{"a":"405529","n":"Fiba Tape glasfiberremsa 5 cm x  90 m","s":"8590930580137","p":93.04,"k":"other","m":1,"l":"Caparol"},{"a":"2009002","n":"Pappersremsa JOINT TAPE 76 M","s":"7391578424002","p":89.04,"k":"other","m":1,"l":"Caparol"},{"a":"901291","n":"Strait-Flex OS-400 2,74 m","s":"0751361502664","p":77.0,"k":"other","m":1,"l":"Caparol"},{"a":"863563","n":"Optimus Inside 90 2,7m BL","s":"","p":76.57,"k":"other","m":1,"l":"Caparol"},{"a":"2014054","n":"Gipsplåster Ultra-patch 2-pack","s":"0751361503685","p":74.36,"k":"other","m":1,"l":"Caparol"},{"a":"901309","n":"Strait-Flex IS-300 2,74 m","s":"0751361502770","p":73.54,"k":"other","m":1,"l":"Caparol"},{"a":"2000892","n":"Skarvsremsa Proline+ CP50 5 cm x 50 m","s":"7350081320607","p":73.08,"k":"other","m":1,"l":"Caparol"},{"a":"405160","n":"CP-50 J-Remsa Mintec 50mmx50m 42st/krt","s":"7332296670500","p":67.68,"k":"other","m":1,"l":"Caparol"},{"a":"901293","n":"Strait-Flex Wet-Stick 2,74 m","s":"0751361502411","p":65.55,"k":"other","m":1,"l":"Caparol"},{"a":"2014051","n":"Skarvremsa Konkret CP50 5cmx50m","s":"7319482935506","p":61.83,"k":"other","m":1,"l":"Caparol"},{"a":"964332","n":"Aqua Våtrumsväv (G900V) 1x25M","s":"4016446812530","p":57.96,"k":"other","m":1,"l":"Caparol"},{"a":"901310","n":"Straitflex Rolling Tool Adapter","s":"7350086760002","p":46.2,"k":"other","m":1,"l":"Caparol"},{"a":"983165","n":"Färgväv Fin förgrundad G100","s":"8590930609890","p":42.19,"k":"other","m":1,"l":"Caparol"},{"a":"2000898","n":"Färgväv Fiskben G165 (1 x 25 m)","s":"8590930610674","p":40.25,"k":"other","m":1,"l":"Caparol"},{"a":"983167","n":"Färgväv Låg förgrundad G135","s":"8590930609913","p":32.82,"k":"other","m":1,"l":"Caparol"},{"a":"405527","n":"Fiba Tape glasfiberremsa 5 cm x  20 m","s":"8590930580786","p":31.43,"k":"other","m":1,"l":"Caparol"},{"a":"983164","n":"Färgväv Fin G100","s":"8590930609883","p":30.04,"k":"other","m":1,"l":"Caparol"},{"a":"983166","n":"Färgväv Låg G135","s":"8590930609906","p":24.22,"k":"other","m":1,"l":"Caparol"},{"a":"405415","n":"Fiberfilt CP 100 1*50 m","s":"7332296610001","p":13.63,"k":"other","m":1,"l":"Caparol"},{"a":"405439","n":"Glasfilt Microlith 8530 50 m/rulle","s":"7391484011587","p":12.71,"k":"other","m":1,"l":"Caparol"},{"a":"405414","n":"Fiberfilt CP 80 0,8*25 m","s":"7332296680004","p":12.66,"k":"other","m":1,"l":"Caparol"},{"a":"2014036","n":"Ardex F5 12,5kg","s":"5703193055127","p":879.95,"k":"other","m":1,"l":"Caparol"},{"a":"979533","n":"Dalapro Design Calm Green 9L","s":"7391578106830","p":636.55,"k":"other","m":1,"l":"Caparol"},{"a":"979534","n":"Dalapro Design Concrete Grey 9L","s":"7391578106823","p":636.55,"k":"other","m":1,"l":"Caparol"},{"a":"939938","n":"One strike filler, 5Lit","s":"5029347300500","p":606.43,"k":"other","m":1,"l":"Caparol"},{"a":"986344","n":"Protega Spackel Novatherm 4SP 2kg","s":"7350003824015","p":603.29,"k":"other","m":1,"l":"Caparol"},{"a":"1013234","n":"Dalapro Lightning Maximum 15 L Hink","s":"7391578102818","p":415.98,"k":"other","m":1,"l":"Caparol"},{"a":"845319","n":"Dalapro Lightning Premium Burk 15 LT","s":"7391578101774","p":398.07,"k":"other","m":1,"l":"Caparol"},{"a":"1013233","n":"Dalapro Lightning Maximum 15 L Säck","s":"7391578102801","p":349.09,"k":"other","m":1,"l":"Caparol"},{"a":"930192","n":"Dalapro Lightning Joint (burk) 15 lit","s":"7391578102368","p":344.49,"k":"other","m":1,"l":"Caparol"},{"a":"405181","n":"Ardex 828 12,5kg","s":"5703193285128","p":331.39,"k":"other","m":1,"l":"Caparol"},{"a":"834377","n":"Dalapro Lightning Premium Säck 15 LT","s":"7391578101767","p":327.51,"k":"other","m":1,"l":"Caparol"},{"a":"1012846","n":"Dalapro Base Coat 14 L","s":"7391578332901","p":321.59,"k":"other","m":1,"l":"Caparol"},{"a":"890233","n":"Dalapro Lightning Nova 15 lit (burk)","s":"7391578102061","p":318.44,"k":"other","m":1,"l":"Caparol"},{"a":"979516","n":"Dalapro Lightning Medium Plus Säck 15L","s":"7391578116747","p":280.85,"k":"other","m":1,"l":"Caparol"},{"a":"890234","n":"Dalapro Lightning Nova 15 lit (säck)","s":"7391578102078","p":278.79,"k":"other","m":1,"l":"Caparol"},{"a":"1002623","n":"Dalapro Robust 10 L","s":"7391578115610","p":276.71,"k":"other","m":1,"l":"Caparol"},{"a":"979522","n":"Dalapro Design White Mix 9L","s":"7391578106816","p":268.45,"k":"other","m":1,"l":"Caparol"},{"a":"2000023","n":"Fill & Finish Roll 15 kg","s":"5901793359465","p":265.12,"k":"other","m":1,"l":"Caparol"},{"a":"930203","n":"Dalapro Lightning Joint (säck) 15 lit","s":"7391578102351","p":263.46,"k":"other","m":1,"l":"Caparol"},{"a":"1012845","n":"Dalapro Edge 10 L","s":"7391578103013","p":258.89,"k":"other","m":1,"l":"Caparol"},{"a":"1013235","n":"Dalapro Roll Maximum 12 L","s":"7391578102856","p":254.26,"k":"other","m":1,"l":"Caparol"},{"a":"896311","n":"Dalapro Roll Joint 12 lit","s":"7391578102375","p":250.06,"k":"other","m":1,"l":"Caparol"},{"a":"931993","n":"Stålplast Flexible 0,55 lit","s":"7315070108512","p":246.71,"k":"other","m":1,"l":"Caparol"},{"a":"931505","n":"Ardex F5, 5kg","s":"5703193055059","p":246.17,"k":"other","m":1,"l":"Caparol"},{"a":"2016008","n":"CP Rollfiller Max 12L","s":"5907591939717","p":241.55,"k":"other","m":1,"l":"Caparol"},{"a":"2000022","n":"Fill & Finish All Purpose 15 kg (säck)","s":"4003982559722","p":241.5,"k":"other","m":1,"l":"Caparol"},{"a":"405290","n":"Rep & Fix 2 kg (krt)","s":"7311020028404","p":240.77,"k":"other","m":1,"l":"Caparol"},{"a":"2014037","n":"Plastic Padding, kemiskt trä 460ml","s":"7311850665879","p":236.9,"k":"other","m":1,"l":"Caparol"},{"a":"405391","n":"Dalapro S Hydro 15 lit (säck) BL","s":"7391578301037","p":235.63,"k":"other","m":1,"l":"Caparol"},{"a":"882433","n":"Dalapro Roll Hydro 12 lit","s":"7391578101941","p":235.53,"k":"other","m":1,"l":"Caparol"},{"a":"885676","n":"Dalapro Roll Nova 12 lit","s":"7391578102054","p":228.32,"k":"other","m":1,"l":"Caparol"},{"a":"906829","n":"Dalapro Airless Nova 15-lit säck","s":"7391578102160","p":215.73,"k":"other","m":1,"l":"Caparol"},{"a":"404680","n":"Stålplast Micro 0,55 lit","s":"7315070109014","p":211.02,"k":"other","m":1,"l":"Caparol"},{"a":"995720","n":"Dalapro Hydro 10L","s":"7391578132204","p":196.8,"k":"other","m":1,"l":"Caparol"},{"a":"940576","n":"Fill & Finish Tinted Allround 11,5 kg","s":"5414434023163","p":193.61,"k":"other","m":1,"l":"Caparol"},{"a":"2000020","n":"Fill & Finish Spray Max 15 kg (hink)","s":"4003982559692","p":192.67,"k":"other","m":1,"l":"Caparol"},{"a":"2000021","n":"Fill & Finish Tool 15 kg","s":"4003982559661","p":181.12,"k":"other","m":1,"l":"Caparol"},{"a":"2000004","n":"Fill & Finish Spray Max 15 kg (säck)","s":"4003982559715","p":177.97,"k":"other","m":1,"l":"Caparol"},{"a":"878465","n":"Dalapro Nova 10 Lit","s":"7391578110042","p":170.65,"k":"other","m":1,"l":"Caparol"},{"a":"849317","n":"Dalapro Premium 10 LT","s":"7391578111803","p":160.53,"k":"other","m":1,"l":"Caparol"},{"a":"1013236","n":"Dalapro Maximum 10 L","s":"7391578141909","p":159.72,"k":"other","m":1,"l":"Caparol"},{"a":"2016007","n":"CP Handfiller Max 10L","s":"5907591939700","p":151.73,"k":"other","m":1,"l":"Caparol"},{"a":"905657","n":"Pulverspackel DM40 12,5 kg","s":"7391578206264","p":151.21,"k":"other","m":1,"l":"Caparol"},{"a":"405180","n":"Ardex 828 5kg","s":"5703193285050","p":150.37,"k":"other","m":1,"l":"Caparol"},{"a":"405396","n":"Dalapro Joint 10 lit","s":"7391578321141","p":147.93,"k":"other","m":1,"l":"Caparol"},{"a":"998933","n":"Pulverspackel DM60 12,5 kg","s":"7391578206202","p":145.46,"k":"other","m":1,"l":"Caparol"},{"a":"2014038","n":"Plastic Padding, kemiskt trä 180ml","s":"7311850664704","p":142.52,"k":"other","m":1,"l":"Caparol"},{"a":"883065","n":"Dalapro Airless Spray 15 lit (säck)","s":"7391578301396","p":138.15,"k":"other","m":1,"l":"Caparol"},{"a":"405390","n":"Dalapro S 15 lit (säck)","s":"7391578301013","p":119.61,"k":"other","m":1,"l":"Caparol"},{"a":"931994","n":"Stålplast Glass Fibre 0,18 lit","s":"7315070108406","p":115.92,"k":"other","m":1,"l":"Caparol"},{"a":"931992","n":"Stålplast Flexible 0,18 lit","s":"7315070108505","p":101.29,"k":"other","m":1,"l":"Caparol"},{"a":"1006424","n":"Dalapro Wood Finish Plus 3 L","s":"7391578332130","p":99.84,"k":"other","m":1,"l":"Caparol"},{"a":"931996","n":"Stålplast Micro 0,18 lit","s":"7315070109038","p":96.4,"k":"other","m":1,"l":"Caparol"},{"a":"868003","n":"Handgipsputs Rotband 10 kg","s":"4006379069941","p":87.33,"k":"other","m":1,"l":"Caparol"},{"a":"1013237","n":"Dalapro Maximum 3 L","s":"7391578141916","p":79.97,"k":"other","m":1,"l":"Caparol"},{"a":"995721","n":"Dalapro Hydro 3L","s":"7391578132211","p":79.57,"k":"other","m":1,"l":"Caparol"},{"a":"405508","n":"One Strike Filler 1 lit","s":"5029347300012","p":75.29,"k":"1L","m":3,"l":"Caparol"},{"a":"998934","n":"Dalapro Joint 3 L","s":"7391578321738","p":74.62,"k":"other","m":1,"l":"Caparol"},{"a":"405399","n":"Dalapro Premium 3 lit","s":"7391578111889","p":69.2,"k":"other","m":1,"l":"Caparol"},{"a":"906828","n":"Dalapro Nova 3-lit","s":"7391578110165","p":67.91,"k":"other","m":1,"l":"Caparol"},{"a":"2014033","n":"One Strike filler 250ml","s":"5029347300029","p":56.35,"k":"other","m":1,"l":"Caparol"},{"a":"905655","n":"Pulverspackel DM20 5 kg","s":"7391578206127","p":54.07,"k":"other","m":1,"l":"Caparol"},{"a":"405587","n":"Modellgips 1,5 kg","s":"4000628015185","p":45.71,"k":"other","m":1,"l":"Caparol"},{"a":"1006423","n":"Dalapro Wood Finish Plus 400 ml","s":"7391578332154","p":38.98,"k":"other","m":1,"l":"Caparol"},{"a":"979519","n":"Dalapro Hydro 400ml","s":"7391578132228","p":33.8,"k":"other","m":1,"l":"Caparol"},{"a":"979517","n":"Dalapro Nova 400ml","s":"7391578110196","p":27.62,"k":"other","m":1,"l":"Caparol"},{"a":"1006402","n":"Dalapro Wood Finish Plus 200 ml","s":"7391578332147","p":25.0,"k":"other","m":1,"l":"Caparol"},{"a":"979647","n":"Dalapro Nova 200ml","s":"7391578110233","p":19.74,"k":"other","m":1,"l":"Caparol"},{"a":"2014063","n":"Fogpistol Proffs Multigun Tec7","s":"5414195014059","p":853.3,"k":"other","m":1,"l":"Caparol"},{"a":"405300","n":"Hernia Våtrumslim KP4 15 LT","s":"7311020049379","p":651.84,"k":"other","m":1,"l":"Caparol"},{"a":"2014062","n":"Fogpistol Proffs TecGun Tec 7","s":"5414195312001","p":583.71,"k":"other","m":1,"l":"Caparol"},{"a":"405368","n":"Remover, 15Lit","s":"7311020040499","p":569.88,"k":"other","m":1,"l":"Caparol"},{"a":"405349","n":"Patronspruta H14 0,3 lit","s":"8711595218948","p":540.78,"k":"other","m":1,"l":"Caparol"},{"a":"405297","n":"Hernia PVP Extra 15 LT BL","s":"7311020049393","p":433.25,"k":"other","m":1,"l":"Caparol"},{"a":"404225","n":"Vävlim Caparol 15KG","s":"7391484011624","p":357.4,"k":"other","m":1,"l":"Caparol"},{"a":"868181","n":"Hernia Non-Woven 15 LT","s":"7311020049485","p":334.13,"k":"other","m":1,"l":"Caparol"},{"a":"405294","n":"Hernia 1870 15 LT","s":"7311020049348","p":293.94,"k":"other","m":1,"l":"Caparol"},{"a":"404221","n":"Tapetlim Caparol 15L","s":"7391484011617","p":230.36,"k":"other","m":1,"l":"Caparol"},{"a":"405299","n":"Hernia Våtrumslim KP4 5 LT","s":"7311020049362","p":227.74,"k":"other","m":1,"l":"Caparol"},{"a":"404230","n":"Linoljekitt Åffa 5 kg","s":"5701054002228","p":199.6,"k":"other","m":1,"l":"Caparol"},{"a":"405301","n":"Contact kontaktlim 0,5 lit","s":"7311020004804","p":168.95,"k":"other","m":1,"l":"Caparol"},{"a":"405296","n":"Hernia PVP Extra 5 LT BL","s":"7311020049386","p":167.92,"k":"other","m":1,"l":"Caparol"},{"a":"868180","n":"Hernia Non-Woven 5 LT","s":"7311020049478","p":143.06,"k":"other","m":1,"l":"Caparol"},{"a":"404233","n":"Vävlim Caparol 5KG","s":"7391484013215","p":137.29,"k":"other","m":1,"l":"Caparol"},{"a":"1014203","n":"H750 Seal & Bond Premium vit 0,29 L","s":"7311020080594","p":135.59,"k":"other","m":1,"l":"Caparol"},{"a":"1014206","n":"H760 Seal'N'Flex Pro Seal vit 0,29 L","s":"7311020080792","p":122.56,"k":"other","m":1,"l":"Caparol"},{"a":"812736","n":"Tec 7 Cleaner 0,5 lit","s":"5414195041215","p":110.68,"k":"other","m":1,"l":"Caparol"},{"a":"2014034","n":"Fönsterkitt LAseal vit 290ml","s":"7332903084249","p":100.79,"k":"other","m":1,"l":"Caparol"},{"a":"404220","n":"Tapetlim Caparol 5L","s":"7391484011600","p":99.89,"k":"other","m":1,"l":"Caparol"},{"a":"848781","n":"Aqua Seal 100 ml","s":"7311020035631","p":98.06,"k":"other","m":1,"l":"Caparol"},{"a":"405377","n":"Silikon Bygg & Sanitet Vit 300 ml","s":"7311020030872","p":91.83,"k":"other","m":1,"l":"Caparol"},{"a":"995843","n":"Aquaseal Våtrumsfog Vit 300ml","s":"7311980136980","p":89.26,"k":"other","m":1,"l":"Caparol"},{"a":"2014050","n":"Semlight Filler 310ml Patron","s":"7393197260146","p":82.98,"k":"other","m":1,"l":"Caparol"},{"a":"1014205","n":"H565 GlassNSeal multi purpose","s":"7311020081935","p":81.81,"k":"other","m":1,"l":"Caparol"},{"a":"405344","n":"Fönsterkitt Natur 300 ml","s":"7311020035150","p":67.77,"k":"other","m":1,"l":"Caparol"},{"a":"952523","n":"A980 Fog Instantly Paintable Vit 300 ml","s":"7311020077709","p":64.79,"k":"other","m":1,"l":"Caparol"},{"a":"963618","n":"Akrylfog Plus 101 Vit 310ML","s":"7090002666062","p":60.16,"k":"other","m":1,"l":"Caparol"},{"a":"964526","n":"Akrylfog 101 Eco Vit 310ML","s":"7090002666079","p":58.06,"k":"other","m":1,"l":"Caparol"},{"a":"405298","n":"Hernia Våtrumslim KP4 1 LT","s":"7311020049355","p":50.33,"k":"1L","m":3,"l":"Caparol"},{"a":"882211","n":"Dalapro Flex (Latexfog) 0,3 lit","s":"7391578206301","p":50.09,"k":"other","m":1,"l":"Caparol"},{"a":"405351","n":"Cellulosasvamp 4","s":"7311020064983","p":47.92,"k":"other","m":1,"l":"Caparol"},{"a":"963617","n":"Akrylfog 101 Vit 310ML","s":"7090002666055","p":46.3,"k":"other","m":1,"l":"Caparol"},{"a":"2014035","n":"Akrylfog Kiilto Vit 310ml","s":"6411512444291","p":45.3,"k":"other","m":1,"l":"Caparol"},{"a":"868179","n":"Hernia Non-Woven 1 LT","s":"7311020049461","p":42.82,"k":"1L","m":3,"l":"Caparol"},{"a":"1014204","n":"A720 Acrylic Paint 0,3 L","s":"7311020001698","p":38.74,"k":"other","m":1,"l":"Caparol"},{"a":"404229","n":"Linoljekitt Åffa 375 ml","s":"5701054002181","p":36.4,"k":"other","m":1,"l":"Caparol"},{"a":"404232","n":"Vävlim Caparol 1KG","s":"7391484013208","p":32.89,"k":"other","m":1,"l":"Caparol"},{"a":"2014064","n":"Fogspruta Classic","s":"7393197910102","p":32.24,"k":"other","m":1,"l":"Caparol"},{"a":"405025","n":"Klisterspruta (PG)","s":"4006972056942","p":29.69,"k":"other","m":1,"l":"Caparol"},{"a":"404231","n":"Tapetlim Caparol 1L","s":"7391484013222","p":28.33,"k":"1L","m":3,"l":"Caparol"},{"a":"991028","n":"Fasadputs ThermoSan K15 Transp 20Kg","s":"4002382055995","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"991027","n":"Fasadputs ThermoSan K15 Vit 20Kg","s":"4002382055988","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"991030","n":"Fasadputs ThermoSan K20 Transp 20Kg","s":"4002382056022","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"991029","n":"Fasadputs ThermoSan K20 Vit 20Kg","s":"4002382056015","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"991032","n":"Fasadputs ThermoSan K30 Transp 20Kg","s":"4002382056046","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"991031","n":"Fasadputs ThermoSan K30 Vit 20Kg","s":"4002382056039","p":1193.85,"k":"other","m":1,"l":"Caparol"},{"a":"713479","n":"MD Mecklenburg Löpsten DF mN 3M2","s":"4002381698049","p":1175.76,"k":"other","m":1,"l":"Caparol"},{"a":"812370","n":"Putsgrund 610 Vit 25 kg","s":"4002381827203","p":1167.58,"k":"other","m":1,"l":"Caparol"},{"a":"51232","n":"MD Altweiss Hörnsten 1-1 NF mN 3M","s":"4002383043205","p":1158.23,"k":"other","m":1,"l":"Caparol"},{"a":"3228","n":"080 Meldorfer Bruk Sandvit 25KG","s":"4002383315852","p":1130.85,"k":"other","m":1,"l":"Caparol"},{"a":"991380","n":"Amphisilan Fasadputs K10 Trans 25 kg","s":"4002382056282","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"988737","n":"Amphisilan Fasadputs K10 Vit 25 kg","s":"4002382051461","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"988789","n":"Amphisilan Fasadputs K15 Trans. 25kg","s":"4002382051362","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"988784","n":"Amphisilan Fasadputs K15 Vit 25kg","s":"4002382051263","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"991381","n":"Amphisilan Fasadputs K20 Trans 25 kg","s":"4002382056299","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"988787","n":"Amphisilan Fasadputs K20 Vit 25 kg","s":"4002382051324","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"991382","n":"Amphisilan Fasadputs K30 Trans 25 kg","s":"4002382056305","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"988788","n":"Amphisilan Fasadputs K30 Vit 25kg","s":"4002382051348","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"996655","n":"AMPHISILAN FASADPUTS K40 VIT 25KG","s":"4002382059665","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"996654","n":"AMPHISILAN FASADPUTS K60 VIT 25KG","s":"4002382059689","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"743621","n":"AMPHISILAN FASADPUTS R30 VIT 25 KG","s":"4002381756848","p":1118.25,"k":"other","m":1,"l":"Caparol"},{"a":"975954","n":"Kulörprov Finest Wall Bas A 0,475L","s":"7391484024945","p":54.42,"k":"other","m":1,"l":"Caparol"},{"a":"975955","n":"Kulörprov Finest Wall Bas D 0,45L","s":"7391484024952","p":54.42,"k":"other","m":1,"l":"Caparol"},{"a":"979086","n":"Kulörprov Inne Bas A 0,475L","s":"7391484025379","p":54.42,"k":"other","m":1,"l":"Caparol"},{"a":"979087","n":"Kulörprov Inne Bas D 0,45L","s":"7391484025386","p":54.42,"k":"other","m":1,"l":"Caparol"},{"a":"2019377","n":"Kulörprov Trä Ute Bas 1 0,475L","s":"7391484057608","p":53.92,"k":"other","m":1,"l":"Caparol"},{"a":"2019378","n":"Kulörprov Trä Ute Bas 3 0,45L","s":"7391484057615","p":53.92,"k":"other","m":1,"l":"Caparol"},{"a":"979088","n":"Kulörprov Ute Bas 1 0,475L","s":"7391484025393","p":26.97,"k":"other","m":1,"l":"Caparol"},{"a":"979089","n":"Kulörprov Ute Bas 3 0,45L","s":"7391484025409","p":26.97,"k":"other","m":1,"l":"Caparol"},{"a":"406085","n":"PLÅT NEUTRAL 10-LIT","s":"","p":55.23,"k":"other","m":1,"l":"Caparol"},{"a":"528183","n":"PLÅT NEUTRAL 3-LIT","s":"","p":36.99,"k":"other","m":1,"l":"Caparol"},{"a":"406084","n":"PLÅT NEUTRAL 0,5-LIT","s":"","p":22.12,"k":"other","m":1,"l":"Caparol"},{"a":"404661","n":"Armeringsmatta 60 cm 50 m/rulle BL","s":"7315070551646","p":16.96,"k":"other","m":1,"l":"Caparol"},{"a":"406006","n":"LOCK PLÅT 10-LIT","s":"","p":13.8,"k":"other","m":1,"l":"Caparol"},{"a":"892754","n":"LOCK PLÅT 3-LIT","s":"","p":9.39,"k":"other","m":1,"l":"Caparol"},{"a":"406010","n":"LOCK PLÅT 1-LIT","s":"","p":5.49,"k":"other","m":1,"l":"Caparol"},{"a":"889347","n":"Färgkarta Svenska Färger","s":"7391484030021","p":650.0,"k":"other","m":1,"l":"Caparol"},{"a":"993028","n":"Provkarta Fogbruk 082 083","s":"4002382056978","p":500.0,"k":"other","m":1,"l":"Caparol"},{"a":"939406","n":"Färgkarta Laserat","s":"7391484051323","p":450.0,"k":"other","m":1,"l":"Caparol"},{"a":"889135","n":"Färgkarta LASYR 25 ST/PAK","s":"7391484030014","p":450.0,"k":"other","m":1,"l":"Caparol"},{"a":"902303","n":"Färgkarta Puts","s":"7391484030991","p":450.0,"k":"other","m":1,"l":"Caparol"},{"a":"975834","n":"Färgkarta Målade Rum","s":"7391484052849","p":250.0,"k":"other","m":1,"l":"Caparol"},{"a":"2007640","n":"Färgkarta Målade Rum Balans","s":"7391484055123","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"2007539","n":"Färgkarta Målade Rum Natur","s":"7391484055116","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"2007538","n":"Färgkarta Målade Rum Värme","s":"7391484055109","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"2021435","n":"Färgkarta Svenska Färger Berså","s":"7391484057813","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"2021434","n":"Färgkarta Svenska Färger Glänta","s":"7391484057806","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"987496","n":"Kulörchips Aster","s":"7391484031318","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987495","n":"Kulörchips Ax","s":"7391484031301","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987444","n":"Kulörchips Baldersbrå","s":"7391484027991","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987528","n":"Kulörchips Balsamin","s":"7391484031639","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987492","n":"Kulörchips Behaglig","s":"7391484031271","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987501","n":"Kulörchips Bingo","s":"7391484031363","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987350","n":"Kulörchips Bleka","s":"7391484025850","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987458","n":"Kulörchips Blåbärsris","s":"7391484028134","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987446","n":"Kulörchips Blågull","s":"7391484028011","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987430","n":"Kulörchips Blåvinge","s":"7391484027854","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987365","n":"Kulörchips Bolster","s":"7391484027205","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987437","n":"Kulörchips Bris","s":"7391484027922","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987518","n":"Kulörchips Brudsporre","s":"7391484031530","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987511","n":"Kulörchips Bruka","s":"7391484031462","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987412","n":"Kulörchips Brus","s":"7391484027670","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987449","n":"Kulörchips Bräken","s":"7391484028042","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987435","n":"Kulörchips Dagg","s":"7391484027908","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987439","n":"Kulörchips Dalgång","s":"7391484027946","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987378","n":"Kulörchips Dimma","s":"7391484027335","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987433","n":"Kulörchips Dimstråk","s":"7391484027885","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987432","n":"Kulörchips Dockyard","s":"7391484027878","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987354","n":"Kulörchips Dreja","s":"7391484025898","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987490","n":"Kulörchips Dröm","s":"7391484031257","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987366","n":"Kulörchips Dun","s":"7391484027212","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987291","n":"Kulörchips Dyn","s":"7391484025751","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987416","n":"Kulörchips Dyning","s":"7391484027717","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987372","n":"Kulörchips Eminens","s":"7391484027274","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987392","n":"Kulörchips Evelynn","s":"7391484027472","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987423","n":"Kulörchips Evig","s":"7391484027786","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987358","n":"Kulörchips Famn","s":"7391484025935","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987494","n":"Kulörchips Fibbla","s":"7391484031295","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987497","n":"Kulörchips Fika","s":"7391484031325","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987410","n":"Kulörchips Fjäll","s":"7391484027656","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987417","n":"Kulörchips Fjälltur","s":"7391484027724","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987500","n":"Kulörchips Fjärran","s":"7391484031356","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987504","n":"Kulörchips Flipflop","s":"7391484031394","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987399","n":"Kulörchips Flocka","s":"7391484027540","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987285","n":"Kulörchips Fläder","s":"7391484025690","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987406","n":"Kulörchips Forsa","s":"7391484027618","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987355","n":"Kulörchips Fri","s":"7391484025904","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987379","n":"Kulörchips Frid","s":"7391484027342","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987485","n":"Kulörchips Fröjd","s":"7391484028400","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987390","n":"Kulörchips Färdas","s":"7391484027458","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987523","n":"Kulörchips Glädje","s":"7391484031585","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987436","n":"Kulörchips Glänta","s":"7391484027915","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987513","n":"Kulörchips Glöd","s":"7391484031486","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987386","n":"Kulörchips Graffiti","s":"7391484027410","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987367","n":"Kulörchips Gryning","s":"7391484027229","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987447","n":"Kulörchips Hage","s":"7391484028028","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987454","n":"Kulörchips Hassel","s":"7391484028097","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987493","n":"Kulörchips Havre","s":"7391484031288","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987488","n":"Kulörchips Havtorn","s":"7391484029216","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987344","n":"Kulörchips Hemma","s":"7391484025782","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987461","n":"Kulörchips Hirs","s":"7391484028165","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987394","n":"Kulörchips Horisont","s":"7391484027496","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987486","n":"Kulörchips Humla","s":"7391484028417","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987499","n":"Kulörchips Hygge","s":"7391484031349","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987438","n":"Kulörchips Härlig","s":"7391484027939","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987426","n":"Kulörchips Ivrig","s":"7391484027816","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987481","n":"Kulörchips Kaka","s":"7391484028363","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987521","n":"Kulörchips Kalvnos","s":"7391484031561","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987288","n":"Kulörchips Kaolin","s":"7391484025720","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987506","n":"Kulörchips Karusell","s":"7391484031417","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987502","n":"Kulörchips Kaveldun","s":"7391484031370","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987286","n":"Kulörchips Klöver","s":"7391484025706","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987517","n":"Kulörchips Knopp","s":"7391484031523","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987360","n":"Kulörchips Knott","s":"7391484025959","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987375","n":"Kulörchips Kraft","s":"7391484027304","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987509","n":"Kulörchips Kram","s":"7391484031448","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987455","n":"Kulörchips Krumspång","s":"7391484028103","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987346","n":"Kulörchips Kulla","s":"7391484025805","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987468","n":"Kulörchips Kvanne","s":"7391484028233","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987380","n":"Kulörchips Lav","s":"7391484027359","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987425","n":"Kulörchips Lin","s":"7391484027809","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987465","n":"Kulörchips Lind","s":"7391484028202","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987397","n":"Kulörchips Ljung","s":"7391484027526","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987489","n":"Kulörchips Ljus","s":"7391484029919","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987401","n":"Kulörchips Luden","s":"7391484027564","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987357","n":"Kulörchips Lugn","s":"7391484025928","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987464","n":"Kulörchips Lyster","s":"7391484028196","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987391","n":"Kulörchips Lä","s":"7391484027465","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987463","n":"Kulörchips Längtan","s":"7391484028189","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987403","n":"Kulörchips Mallig","s":"7391484027588","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987408","n":"Kulörchips Malva","s":"7391484027632","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987407","n":"Kulörchips Melodi","s":"7391484027625","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987389","n":"Kulörchips Minne","s":"7391484027441","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987505","n":"Kulörchips Mjuk","s":"7391484031400","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987398","n":"Kulörchips Mogen","s":"7391484027533","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987466","n":"Kulörchips Moped","s":"7391484028219","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987529","n":"Kulörchips Morgan","s":"7391484031646","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987507","n":"Kulörchips Morgon","s":"7391484031424","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987474","n":"Kulörchips Myrten","s":"7391484028295","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987345","n":"Kulörchips Mysa","s":"7391484025799","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987292","n":"Kulörchips Mård","s":"7391484025768","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987400","n":"Kulörchips Nyfiken","s":"7391484027557","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987381","n":"Kulörchips Nöjd","s":"7391484027366","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987440","n":"Kulörchips Oas","s":"7391484027953","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987459","n":"Kulörchips Odon","s":"7391484028141","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987347","n":"Kulörchips Oknytt","s":"7391484025812","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987524","n":"Kulörchips Pixie","s":"7391484031592","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987424","n":"Kulörchips Plask","s":"7391484027793","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987371","n":"Kulörchips Plym","s":"7391484027267","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987362","n":"Kulörchips Poem","s":"7391484025973","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987413","n":"Kulörchips Porla","s":"7391484027687","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987348","n":"Kulörchips Porter","s":"7391484025836","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987527","n":"Kulörchips Punka","s":"7391484031622","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987516","n":"Kulörchips Påtår","s":"7391484031516","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987374","n":"Kulörchips Pöl","s":"7391484027298","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987525","n":"Kulörchips Rabarb","s":"7391484031608","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987409","n":"Kulörchips Resa","s":"7391484027649","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987452","n":"Kulörchips Reva","s":"7391484028073","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987361","n":"Kulörchips Ripa","s":"7391484025966","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987519","n":"Kulörchips Rodnad","s":"7391484031547","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987396","n":"Kulörchips Rofylld","s":"7391484027519","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987472","n":"Kulörchips Rova","s":"7391484028271","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987475","n":"Kulörchips Sabayonne","s":"7391484028301","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987512","n":"Kulörchips Saft","s":"7391484031479","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987469","n":"Kulörchips Salong","s":"7391484028240","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987289","n":"Kulörchips Sand","s":"7391484025737","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987508","n":"Kulörchips Schalett","s":"7391484031431","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987483","n":"Kulörchips Schottis","s":"7391484028387","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987431","n":"Kulörchips Semester","s":"7391484027861","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987520","n":"Kulörchips Simca","s":"7391484031554","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987443","n":"Kulörchips Sjö","s":"7391484027984","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987352","n":"Kulörchips Sjösten","s":"7391484025874","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987422","n":"Kulörchips Skare","s":"7391484027779","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987353","n":"Kulörchips Skir","s":"7391484025881","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987383","n":"Kulörchips Skogsrå","s":"7391484027380","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987384","n":"Kulörchips Skugga","s":"7391484027397","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987377","n":"Kulörchips Sky","s":"7391484027328","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987457","n":"Kulörchips Skyfall","s":"7391484028127","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987476","n":"Kulörchips Skörd","s":"7391484028318","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987356","n":"Kulörchips Slips","s":"7391484025911","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987434","n":"Kulörchips Slädtur","s":"7391484027892","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987402","n":"Kulörchips Slända","s":"7391484027571","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987484","n":"Kulörchips Snoa","s":"7391484028394","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987487","n":"Kulörchips Snooza","s":"7391484028424","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987470","n":"Kulörchips Snäll","s":"7391484028257","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987456","n":"Kulörchips Sommarminne","s":"7391484028110","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987462","n":"Kulörchips Spröd","s":"7391484028172","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987376","n":"Kulörchips Starship","s":"7391484027311","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987414","n":"Kulörchips Stilla","s":"7391484027694","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987404","n":"Kulörchips Stolt","s":"7391484027595","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987368","n":"Kulörchips Storstad","s":"7391484027236","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987343","n":"Kulörchips Strand","s":"7391484025775","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987448","n":"Kulörchips Strandkant","s":"7391484028035","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987349","n":"Kulörchips Stratus","s":"7391484025843","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987477","n":"Kulörchips Strå","s":"7391484028325","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987479","n":"Kulörchips Stråla","s":"7391484028349","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987382","n":"Kulörchips Sträv","s":"7391484027373","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987428","n":"Kulörchips Strömma","s":"7391484027830","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987473","n":"Kulörchips Stubbe","s":"7391484028288","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987411","n":"Kulörchips Sus","s":"7391484027663","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987420","n":"Kulörchips Sval","s":"7391484027755","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987387","n":"Kulörchips Svala","s":"7391484027427","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987415","n":"Kulörchips Svall","s":"7391484027700","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987385","n":"Kulörchips Svindel","s":"7391484027403","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987405","n":"Kulörchips Svärmare","s":"7391484027601","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987515","n":"Kulörchips Sällskap","s":"7391484031509","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987491","n":"Kulörchips Säv","s":"7391484031264","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987503","n":"Kulörchips Söt","s":"7391484031387","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987429","n":"Kulörchips Tistel","s":"7391484027847","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987418","n":"Kulörchips Tjärn","s":"7391484027731","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987395","n":"Kulörchips Toka","s":"7391484027502","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987442","n":"Kulörchips Topptur","s":"7391484027977","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987453","n":"Kulörchips Trivas","s":"7391484028080","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987373","n":"Kulörchips Troll","s":"7391484027281","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987290","n":"Kulörchips Tröst","s":"7391484025744","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987364","n":"Kulörchips Tö","s":"7391484027199","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987530","n":"Kulörchips Törne","s":"7391484031653","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987369","n":"Kulörchips Ull","s":"7391484027243","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987526","n":"Kulörchips Utflykt","s":"7391484031615","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987480","n":"Kulörchips Utsikt","s":"7391484028356","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987450","n":"Kulörchips Vak","s":"7391484028059","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987370","n":"Kulörchips Valp","s":"7391484027250","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987514","n":"Kulörchips Vals","s":"7391484031493","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987482","n":"Kulörchips Vass","s":"7391484028370","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987478","n":"Kulörchips Vide","s":"7391484028332","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987498","n":"Kulörchips Vild","s":"7391484031332","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987441","n":"Kulörchips Vildmark","s":"7391484027960","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987351","n":"Kulörchips Vindel","s":"7391484025867","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987419","n":"Kulörchips Vindil","s":"7391484027748","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987363","n":"Kulörchips Vindstilla","s":"7391484025980","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987451","n":"Kulörchips Vinka","s":"7391484028066","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987421","n":"Kulörchips Vintervy","s":"7391484027762","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987393","n":"Kulörchips Vippa","s":"7391484027489","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987359","n":"Kulörchips Vrå","s":"7391484025942","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987460","n":"Kulörchips Vy","s":"7391484028158","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987287","n":"Kulörchips Vän","s":"7391484025713","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987427","n":"Kulörchips Väntan","s":"7391484027823","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987522","n":"Kulörchips Värme","s":"7391484031578","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987467","n":"Kulörchips Åker","s":"7391484028226","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987471","n":"Kulörchips Älva","s":"7391484028264","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987388","n":"Kulörchips Äntligen","s":"7391484027434","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987445","n":"Kulörchips Ökennatt","s":"7391484028004","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"987510","n":"Kulörchips Ömsint","s":"7391484031455","p":21.0,"k":"other","m":1,"l":"Caparol"},{"a":"405819","n":"Caparol Rörpinnar Stor 250ST/KRT","s":"7391484055024","p":3.44,"k":"other","m":1,"l":"Caparol"},{"a":"405818","n":"Caparol Rörpinnar Liten 1000ST/KRT","s":"7391484055031","p":3.2,"k":"other","m":1,"l":"Caparol"},{"a":"883756","n":"Produktblad Carat","s":"7391484029193","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"931125","n":"Produktbroschyr Färgexpert utomhus","s":"7391484050913","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"889614","n":"Uppstrykningsprover Svenska Färger 90st","s":"7391484030045","p":5580.0,"k":"other","m":1,"l":"Caparol"},{"a":"903314","n":"Uppstrykningsprover Puts 45st","s":"7391484031103","p":3420.0,"k":"other","m":1,"l":"Caparol"},{"a":"889613","n":"Uppstrykningsprover Lasyr 54st","s":"7391484030038","p":3348.0,"k":"other","m":1,"l":"Caparol"},{"a":"936545","n":"Bärkasse 80 % återv Caparol","s":"7391484051194","p":1250.0,"k":"other","m":1,"l":"Caparol"},{"a":"996908","n":"Caparol Pappersmugg brun 23cl 1000st/kar","s":"7391484031936","p":980.0,"k":"other","m":1,"l":"Caparol"},{"a":"2011585","n":"Papperspåse Caparol 250 st/kar","s":"7391484055307","p":750.0,"k":"other","m":1,"l":"Caparol"},{"a":"80961","n":"Caparol Tygelefant Maxi st","s":"4002381111739","p":700.0,"k":"other","m":1,"l":"Caparol"},{"a":"2001299","n":"Caparol  flagga Blå 1500x3000","s":"7391484054614","p":499.0,"k":"other","m":1,"l":"Caparol"},{"a":"2001320","n":"Caparol  flagga Grön 1500x3000","s":"7391484054621","p":499.0,"k":"other","m":1,"l":"Caparol"},{"a":"2001298","n":"Caparol  flagga Violet 1500x3000","s":"7391484054607","p":499.0,"k":"other","m":1,"l":"Caparol"},{"a":"890356","n":"Caparol Flagga Svart 150x350","s":"7391484030151","p":400.0,"k":"other","m":1,"l":"Caparol"},{"a":"889110","n":"Mast till Beachflagga","s":"7391484030007","p":360.0,"k":"other","m":1,"l":"Caparol"},{"a":"885552","n":"Caparol Beachflagga","s":"7391484029797","p":350.0,"k":"other","m":1,"l":"Caparol"},{"a":"1007315","n":"Caparol sportväska","s":"7332931023821","p":332.0,"k":"other","m":1,"l":"Caparol"},{"a":"80962","n":"Caparol Tygelefant Midi","s":"4002381111753","p":300.0,"k":"other","m":1,"l":"Caparol"},{"a":"932086","n":"Kryssfot till Beachflagga","s":"7391484050951","p":300.0,"k":"other","m":1,"l":"Caparol"},{"a":"976081","n":"Caparol Pennor 50ST/KRT","s":"7391484052856","p":209.0,"k":"other","m":1,"l":"Caparol"},{"a":"978984","n":"Caparol 3D System Plus Solfjäder","s":"4002382039599","p":208.16,"k":"other","m":1,"l":"Caparol"},{"a":"1008830","n":"Caparol Pallsvep Blå","s":"7391484032254","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"1008831","n":"Caparol Pallsvep Grön","s":"7391484032261","p":200.0,"k":"other","m":1,"l":"Caparol"},{"a":"801799","n":"Caparol Burköppnare","s":"7391484028943","p":12.54,"k":"other","m":1,"l":"Caparol"},{"a":"1016753","n":"BEACHFLAGGA BLÅ CAPAROL","s":"7391484033756","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"1016754","n":"BEACHFLAGGA GRÖN CAPAROL","s":"7391484033763","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"871977","n":"Caparol Nymålatskylt 25-pak","s":"7391484026659","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"969349","n":"Produktblad Aqua 25 st/pak","s":"7391484052573","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"1012831","n":"Produktblad Capafree","s":"7391484032377","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"985756","n":"Produktblad Intact Matt","s":"7391484025621","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"1012832","n":"Produktblad Intact Vision","s":"7391484032384","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"944078","n":"Produktblad Lasyr 25 st/pak","s":"7391484051590","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"1012843","n":"Produktblad PRO Interior","s":"7391484032391","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"1012844","n":"Produktblad Super Finish 40","s":"7391484032407","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"935058","n":"Produktbroschyr Capafree Caparol 25ST/PK","s":"7391484051118","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"968069","n":"Produktbroschyr Capatect Systemöversikt","s":"7391484052542","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"939214","n":"Produktbroschyr Färgexpert inomhus","s":"7391484051279","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"935008","n":"Produktbroschyr IndekoGeo 25 st/pak","s":"7391484051125","p":0.01,"k":"other","m":1,"l":"Caparol"},{"a":"899698","n":"Produktbroschyr Nespri","s":"7391484030687","p":0.01,"k":"other","m":1,"l":"Caparol"}];
+function expandDB(raw){
+  return raw.map(r=>({
+    artikelnummer:r.a, artikelnamn:r.n, streckkod:r.s,
+    inkopspris:r.p, storlekskategori:r.k, minAntal:r.m, leverantor:r.l
+  }));
+}
+
+// Suppliers config — add more here or via future CSV uploads
+const SUPPLIERS = [
+  { id:'Caparol', name:'Caparol', icon:'🎨', fraktfritt:10000 }
+  // Future: { id:'Leverantör2', name:'Leverantör 2', icon:'🏭', fraktfritt:8000 }
+];
+
+let db = JSON.parse(localStorage.getItem('produktDB_v3')||'null');
+if(!db){ db = expandDB(RAW); }
+let order = JSON.parse(localStorage.getItem('order_v3')||'[]');
+let history = JSON.parse(localStorage.getItem('history_v3')||'[]');
+let currentUser = '';
+let currentSupplier = null;
+let currentProduct = null, currentQty = 1, editIdx = null, scannerActive = false;
+let byBarcode={}, byArtNr={};
+
+function buildIndex(){
+  byBarcode={}; byArtNr={};
+  db.forEach((p,i)=>{ if(p.streckkod) byBarcode[p.streckkod]=i; byArtNr[p.artikelnummer]=i; });
+}
+buildIndex();
+function saveDB(){ localStorage.setItem('produktDB_v3',JSON.stringify(db)); buildIndex(); }
+function saveOrder(){ localStorage.setItem('order_v3',JSON.stringify(order)); }
+function saveHistory(){ localStorage.setItem('history_v3',JSON.stringify(history)); }
+
+// ═══════════════════════════════
+// START SCREEN
+// ═══════════════════════════════
+function initSuppliers(){
+  const grid = document.getElementById('supplier-grid');
+  const counts = {};
+  SUPPLIERS.forEach(s=>{ counts[s.id]=db.filter(p=>p.leverantor===s.id).length; });
+  grid.innerHTML = SUPPLIERS.map(s=>`
+    <button class="supplier-btn" id="sup-${s.id}" onclick="selectSupplier('${s.id}')">
+      <div class="supplier-icon">${s.icon}</div>
+      <div class="supplier-info">
+        <div class="supplier-name">${s.name}</div>
+        <div class="supplier-count">${counts[s.id]} artiklar</div>
+      </div>
+      <div class="supplier-check">✓</div>
+    </button>`).join('');
+}
+initSuppliers();
+
+function selectSupplier(id){
+  currentSupplier = SUPPLIERS.find(s=>s.id===id);
+  document.querySelectorAll('.supplier-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('sup-'+id).classList.add('selected');
+  checkStartReady();
+}
+
+function checkStartReady(){
+  const name = document.getElementById('user-name-input').value.trim();
+  document.getElementById('start-cta').disabled = !(name && currentSupplier);
+}
+
+function tryStart(){
+  const name = document.getElementById('user-name-input').value.trim();
+  if(!name){ document.getElementById('user-name-input').style.borderColor='var(--red)'; return; }
+  if(!currentSupplier){ notify('Välj en leverantör','warning'); return; }
+  currentUser = name;
+  // Switch to app
+  document.getElementById('screen-start').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+  document.getElementById('header-title').textContent = currentSupplier.name.toUpperCase();
+  document.getElementById('header-sub').textContent = '👤 '+currentUser;
+  document.getElementById('order-placer').textContent = currentUser;
+  document.getElementById('order-supplier').textContent = currentSupplier.name;
+  document.getElementById('db-supplier-label').textContent = currentSupplier.name;
+  updateProgress(); updateBadge();
+  setTab('scan', document.getElementById('tab-scan'));
+}
+
+function goBack(){
+  if(scannerActive) stopScanner();
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-start').classList.add('active');
+}
+
+// ═══════════════════════════════
+// TABS
+// ═══════════════════════════════
+function setTab(tab, btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if(tab==='order') renderOrder();
+  if(tab==='db') renderDB();
+  if(tab==='hist') renderHistory();
+  if(tab!=='scan' && scannerActive) stopScanner();
+}
+
+// ═══════════════════════════════
+// FORMAT
+// ═══════════════════════════════
+function fmt(n){ return n.toLocaleString('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2})+' kr'; }
+function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('sv-SE')+' '+d.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}); }
+
+// ═══════════════════════════════
+// LOOKUP (filtered by supplier)
+// ═══════════════════════════════
+function lookup(term){
+  const clean=term.trim();
+  let idx=byBarcode[clean];
+  if(idx===undefined) idx=byArtNr[clean];
+  if(idx===undefined) return null;
+  const p=db[idx];
+  // Only show products from current supplier
+  if(p.leverantor && currentSupplier && p.leverantor!==currentSupplier.id) return null;
+  return p;
+}
+
+function showProduct(p){
+  currentProduct=p;
+  currentQty=p.minAntal||1;
+  document.getElementById('card-name').textContent=p.artikelnamn;
+  document.getElementById('card-nr').textContent='Art.nr: '+p.artikelnummer;
+  document.getElementById('card-price').textContent=fmt(p.inkopspris)+' / st';
+  document.getElementById('qty-display').textContent=currentQty;
+  const min=p.minAntal||1;
+  const hint=document.getElementById('min-qty-hint');
+  if(min>1){ hint.textContent='Min '+min+' st'; hint.style.display='block'; }
+  else { hint.style.display='none'; }
+  document.getElementById('product-card').style.display='block';
+}
+
+function manualLookup(){
+  const val=document.getElementById('manual-input').value.trim();
+  if(!val) return;
+  const p=lookup(val);
+  if(p){ showProduct(p); notify('Artikel hittad ✓','success'); }
+  else { notify('Artikel hittades inte','warning'); document.getElementById('product-card').style.display='none'; }
+}
+
+// ═══════════════════════════════
+// QTY
+// ═══════════════════════════════
+function changeQty(delta){
+  if(!currentProduct) return;
+  const min=currentProduct.minAntal||1;
+  currentQty=Math.max(min, currentQty+delta);
+  document.getElementById('qty-display').textContent=currentQty;
+}
+
+// ═══════════════════════════════
+// ORDER
+// ═══════════════════════════════
+function addToOrder(){
+  if(!currentProduct) return;
+  const ex=order.find(i=>i.artikelnummer===currentProduct.artikelnummer);
+  if(ex){ ex.antal+=currentQty; }
+  else { order.push({artikelnummer:currentProduct.artikelnummer,artikelnamn:currentProduct.artikelnamn,inkopspris:currentProduct.inkopspris,minAntal:currentProduct.minAntal||1,antal:currentQty}); }
+  saveOrder(); updateProgress(); updateBadge();
+  notify('✓ Tillagd: '+currentProduct.artikelnamn.substring(0,30),'success');
+  const thresh=currentSupplier?currentSupplier.fraktfritt:10000;
+  if(orderTotal()>=thresh) setTimeout(()=>notify('🚚 FRAKTFRITT uppnått!','success'),500);
+}
+
+function orderTotal(){ return order.reduce((s,i)=>s+i.inkopspris*i.antal,0); }
+
+function updateProgress(){
+  const total=orderTotal();
+  const thresh=currentSupplier?currentSupplier.fraktfritt:10000;
+  const pct=Math.min(100,(total/thresh)*100);
+  document.getElementById('progress-fill').style.width=pct+'%';
+  document.getElementById('progress-fill').classList.toggle('done',total>=thresh);
+  document.getElementById('progress-label').textContent=fmt(total);
+  document.getElementById('freight-banner').classList.toggle('visible',total>=thresh);
+  document.getElementById('progress-wrap').style.display=total>=thresh?'none':'block';
+  const th=document.getElementById('order-total-h');
+  if(th) th.textContent=fmt(total);
+}
+
+function updateBadge(){
+  const count=order.reduce((s,i)=>s+i.antal,0);
+  document.getElementById('badge').textContent=count>0?'('+count+')':'';
+}
+
+function renderOrder(){
+  const total=orderTotal();
+  document.getElementById('order-total-h').textContent=fmt(total);
+  document.getElementById('order-placer').textContent=currentUser;
+  document.getElementById('order-supplier').textContent=currentSupplier?currentSupplier.name:'';
+  const list=document.getElementById('order-list');
+  if(order.length===0){
+    list.innerHTML='<div class="order-empty">Inga artiklar i ordern ännu.<br>Scanna en streckkod för att börja!</div>';
+    document.getElementById('order-footer').style.display='none';
+    return;
+  }
+  document.getElementById('order-footer').style.display='flex';
+  document.getElementById('order-count').textContent=order.length;
+  document.getElementById('order-total-f').textContent=fmt(total);
+  list.innerHTML=order.map((item,idx)=>`
+    <div class="order-item">
+      <div class="order-item-top">
+        <div class="order-item-name">${item.artikelnamn}</div>
+        <button class="delete-btn" onclick="removeItem(${idx})">✕</button>
+      </div>
+      <div class="order-item-bottom">
+        <div class="order-item-nr">Art.nr ${item.artikelnummer}</div>
+        <div class="order-item-qty">
+          <button onclick="chOrderQty(${idx},-1)">−</button>
+          <span class="order-qty-num">${item.antal}</span>
+          <button onclick="chOrderQty(${idx},1)">+</button>
+        </div>
+        <div class="order-item-price">${fmt(item.inkopspris*item.antal)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function chOrderQty(idx,delta){
+  const item=order[idx];
+  const min=item.minAntal||1;
+  const nq=item.antal+delta;
+  if(nq<min){ notify('Minsta antal: '+min+' st','warning'); return; }
+  item.antal=nq;
+  if(item.antal<=0){ order.splice(idx,1); }
+  saveOrder(); updateProgress(); updateBadge(); renderOrder();
+}
+
+function removeItem(idx){
+  order.splice(idx,1);
+  saveOrder(); updateProgress(); updateBadge(); renderOrder();
+}
+
+function sendOrder(){
+  if(order.length===0){ notify('Ordern är tom','warning'); return; }
+  history.unshift({id:Date.now(),placer:currentUser,leverantor:currentSupplier?currentSupplier.name:'',datum:Date.now(),total:orderTotal(),artiklar:JSON.parse(JSON.stringify(order))});
+  saveHistory();
+  order=[]; saveOrder(); updateProgress(); updateBadge(); renderOrder();
+  notify('✓ Order skickad!','success');
+}
+
+function clearOrder(){
+  if(!confirm('Rensa hela beställningen?')) return;
+  order=[]; saveOrder(); updateProgress(); updateBadge(); renderOrder();
+  notify('Order rensad','info');
+}
+
+// ═══════════════════════════════
+// HISTORY
+// ═══════════════════════════════
+function renderHistory(){
+  const q=(document.getElementById('hist-search')?.value||'').toLowerCase();
+  const filtered=history.filter(h=>!q||h.placer.toLowerCase().includes(q)||(h.leverantor||'').toLowerCase().includes(q)||fmtDate(h.datum).includes(q));
+  const list=document.getElementById('hist-list');
+  if(filtered.length===0){ list.innerHTML='<div class="hist-empty">Ingen historik ännu.</div>'; return; }
+  list.innerHTML=filtered.map(h=>`
+    <div class="hist-item">
+      <div class="hist-header" onclick="toggleHist(${h.id})">
+        <div>
+          <div class="hist-placer">👤 ${h.placer}</div>
+          <div class="hist-date">${fmtDate(h.datum)}</div>
+          ${h.leverantor?'<div class="hist-supplier-tag">'+h.leverantor+'</div>':''}
+        </div>
+        <div class="hist-right">
+          <div class="hist-total">${fmt(h.total)}</div>
+          <div class="hist-count">${h.artiklar.length} art.</div>
+        </div>
+      </div>
+      <div class="hist-body" id="hb-${h.id}">
+        ${h.artiklar.map(a=>`
+          <div class="hist-row">
+            <div class="hist-row-name">${a.artikelnamn}</div>
+            <div class="hist-row-right">
+              <span class="hist-row-qty">×${a.antal}</span>
+              <span class="hist-row-price">${fmt(a.inkopspris*a.antal)}</span>
+            </div>
+          </div>`).join('')}
+        <div class="hist-actions">
+          <button class="hist-action-btn btn-reload" onclick="reloadOrder(${h.id})">↩ Lägg i order</button>
+          <button class="hist-action-btn btn-delete" onclick="deleteHistory(${h.id})">🗑 Ta bort</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleHist(id){ document.getElementById('hb-'+id).classList.toggle('open'); }
+function deleteHistory(id){ if(!confirm('Ta bort?')) return; history=history.filter(h=>h.id!==id); saveHistory(); renderHistory(); }
+function reloadOrder(id){
+  const entry=history.find(h=>h.id===id); if(!entry) return;
+  entry.artiklar.forEach(a=>{ const ex=order.find(i=>i.artikelnummer===a.artikelnummer); if(ex) ex.antal+=a.antal; else order.push({...a}); });
+  saveOrder(); updateProgress(); updateBadge();
+  notify('↩ Order laddad från historik','success');
+  setTab('order',document.getElementById('tab-order'));
+}
+
+// ═══════════════════════════════
+// DB VIEW
+// ═══════════════════════════════
+function renderDB(){
+  const q=(document.getElementById('db-search')?.value||'').toLowerCase();
+  const supId=currentSupplier?currentSupplier.id:null;
+  const filtered=db.filter(p=>{
+    if(supId && p.leverantor!==supId) return false;
+    return !q||p.artikelnamn.toLowerCase().includes(q)||p.artikelnummer.includes(q)||p.streckkod.includes(q);
+  });
+  const list=document.getElementById('db-list');
+  if(filtered.length===0){ list.innerHTML='<div style="color:var(--muted);font-size:15px;padding:40px;text-align:center">Inga resultat</div>'; return; }
+  list.innerHTML=filtered.slice(0,200).map(p=>{
+    const idx=db.indexOf(p);
+    return `<div class="db-item" onclick="selectFromDB(${idx})">
+      <div class="db-item-info">
+        <div class="db-item-name">${p.artikelnamn}</div>
+        <div class="db-item-meta">Art.nr ${p.artikelnummer} · ${p.streckkod||'—'}</div>
+        ${p.minAntal>1?'<div class="db-item-min">⚡ Min '+p.minAntal+' st</div>':''}
+      </div>
+      <div class="db-item-right">
+        <div class="db-item-price">${fmt(p.inkopspris)}</div>
+        <button class="edit-btn" onclick="event.stopPropagation();openEdit(${idx})">✏️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectFromDB(idx){ showProduct(db[idx]); setTab('scan',document.getElementById('tab-scan')); }
+
+// ═══════════════════════════════
+// EDIT MODAL
+// ═══════════════════════════════
+function openEdit(idx){
+  editIdx=idx; const p=db[idx];
+  document.getElementById('edit-name').value=p.artikelnamn;
+  document.getElementById('edit-price').value=p.inkopspris;
+  document.getElementById('edit-barcode').value=p.streckkod;
+  document.getElementById('edit-min').value=p.minAntal||1;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); editIdx=null; }
+function saveEdit(){
+  if(editIdx===null) return;
+  db[editIdx].artikelnamn=document.getElementById('edit-name').value.trim()||db[editIdx].artikelnamn;
+  db[editIdx].inkopspris=parseFloat(document.getElementById('edit-price').value)||db[editIdx].inkopspris;
+  db[editIdx].streckkod=document.getElementById('edit-barcode').value.trim();
+  db[editIdx].minAntal=parseInt(document.getElementById('edit-min').value)||1;
+  saveDB(); closeModal(); renderDB(); notify('Sparad ✓','success');
+}
+
+// ═══════════════════════════════
+// SCANNER
+// ═══════════════════════════════
+let lastCode='', lastTime=0;
+function toggleScanner(){ scannerActive?stopScanner():startScanner(); }
+function startScanner(){
+  scannerActive=true;
+  document.getElementById('scanner-box').classList.add('scanner-active');
+  document.getElementById('scan-btn').textContent='⏹ STOPPA SCANNING';
+  document.getElementById('scan-btn').classList.add('scanning');
+  Quagga.init({
+    inputStream:{type:'LiveStream',target:document.getElementById('interactive'),constraints:{facingMode:'environment',width:{ideal:1280},height:{ideal:480}}},
+    decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','code_39_reader']},
+    locate:true, numOfWorkers:2, frequency:10
+  },err=>{
+    if(err){ notify('Kamera ej tillgänglig','warning'); stopScanner(); return; }
+    Quagga.start();
+  });
+  Quagga.onDetected(result=>{
+    const code=result.codeResult.code;
+    const now=Date.now();
+    if(code===lastCode && now-lastTime<2500) return;
+    lastCode=code; lastTime=now;
+    const p=lookup(code);
+    if(p){ if(navigator.vibrate) navigator.vibrate([80,30,80]); showProduct(p); stopScanner(); notify('✓ '+p.artikelnamn.substring(0,32),'success'); }
+    else { notify('Okänd kod: '+code,'warning'); }
+  });
+}
+function stopScanner(){
+  scannerActive=false;
+  document.getElementById('scanner-box').classList.remove('scanner-active');
+  document.getElementById('scan-btn').textContent='📷 SCANNA STRECKKOD';
+  document.getElementById('scan-btn').classList.remove('scanning');
+  try{ Quagga.stop(); }catch(e){}
+}
+
+// ═══════════════════════════════
+// NOTIFICATION
+// ═══════════════════════════════
+let ntimer;
+function notify(msg,type){
+  const el=document.getElementById('notification');
+  el.textContent=msg; el.className='show '+(type||'info');
+  clearTimeout(ntimer); ntimer=setTimeout(()=>el.className='',3000);
+}
+</script>
+</body>
+</html>
