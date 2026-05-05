@@ -7,10 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
-@media screen and (orientation: landscape) {
-  #rotate-overlay { display: flex !important; }
-  #screen-start, #screen-app { display: none !important; }
-}
+
 
 /* kulör */
 /* welin info */
@@ -40,6 +37,7 @@
 </style>
 <title>Beställningsapp</title>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
 :root{
@@ -351,10 +349,8 @@ header{background:var(--panel);border-bottom:1px solid var(--border);padding:14p
 <body>
 
 <!-- ════ START SCREEN ════ -->
-<div id="rotate-overlay" style="display:none;position:fixed;inset:0;background:#0a0a0f;z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:20px;">
-  <div style="font-size:64px;animation:rotatePhone 2s ease-in-out infinite">📱</div>
-  <div style="font-family:'IBM Plex Sans',sans-serif;font-size:20px;font-weight:600;color:#e8e8f0;text-align:center;padding:0 40px">Vrid telefonen till<br>stående läge</div>
-  <style>@keyframes rotatePhone{0%,100%{transform:rotate(0deg)}50%{transform:rotate(90deg)}}</style>
+  <div class="rotate-text">Vrid telefonen till<br>stående läge</div>
+  <div class="rotate-sub">Appen fungerar bara i stående läge</div>
 </div>
 <div class="screen active" id="screen-start">
 <div class="start-inner">
@@ -704,7 +700,7 @@ function showProduct(p){
   const needsKulor = /alkyd|metal.?finish/i.test(p.artikelnamn);
   const kulorWrap = document.getElementById('kulor-card-wrap');
   kulorWrap.style.display = needsKulor ? 'block' : 'none';
-  if(needsKulor) document.getElementById('kulor-card-input').value = '';
+  document.getElementById('kulor-card-input').value = '';
   document.getElementById('product-card').style.display='block';
 }
 
@@ -721,8 +717,13 @@ function manualLookup(){
 // ═══════════════════════════════
 function changeQty(delta){
   if(!currentProduct) return;
-  const min=currentProduct.minAntal||1;
-  currentQty=Math.max(min, currentQty+delta);
+  const min = currentProduct.minAntal || 1;
+  const step = (currentProduct.leverantor === 'Caparol' && min > 1) ? min : 1;
+  if(delta > 0){
+    currentQty = currentQty + step;
+  } else {
+    currentQty = Math.max(min, currentQty - step);
+  }
   document.getElementById('qty-display').textContent=currentQty;
 }
 
@@ -734,7 +735,7 @@ function addToOrder(){
   const kulorVal = document.getElementById('kulor-card-input').value.trim().toUpperCase() || null;
   const ex=order.find(i=>i.artikelnummer===currentProduct.artikelnummer && i.kulor===(kulorVal||undefined));
   if(ex){ ex.antal+=currentQty; }
-  else { order.push({artikelnummer:currentProduct.artikelnummer,artikelnamn:currentProduct.artikelnamn,inkopspris:currentProduct.inkopspris,minAntal:currentProduct.minAntal||1,antal:currentQty,kulor:kulorVal||undefined}); }
+  else { order.push({artikelnummer:currentProduct.artikelnummer,artikelnamn:currentProduct.artikelnamn,inkopspris:currentProduct.inkopspris,minAntal:currentProduct.minAntal||1,leverantor:currentProduct.leverantor||'',antal:currentQty,kulor:kulorVal||undefined}); }
   saveOrder(); updateProgress(); updateBadge();
   notify('✓ Tillagd: '+currentProduct.artikelnamn.substring(0,30),'success');
   const thresh=currentSupplier?currentSupplier.fraktfritt:10000;
@@ -832,8 +833,9 @@ function removeKulor(idx){
 function chOrderQty(idx,delta){
   const item=order[idx];
   const min=item.minAntal||1;
-  const nq=item.antal+delta;
-  if(nq<min){ notify('Minsta antal: '+min+' st','warning'); return; }
+  const step = (item.leverantor === 'Caparol' && min > 1) ? min : 1;
+  const nq = item.antal + (delta > 0 ? step : -step);
+  if(nq < min){ notify('Minsta antal: '+min+' st','warning'); return; }
   item.antal=nq;
   if(item.antal<=0){ order.splice(idx,1); }
   saveOrder(); updateProgress(); updateBadge(); renderOrder();
@@ -845,11 +847,19 @@ function removeItem(idx){
 }
 
 function sendOrder(){
-  if(order.length===0){ notify('Ordern är tom','warning'); return; }
+  if(order.length===0){ notify('Ordern er tom','warning'); return; }
 
   const sup = currentSupplier;
   const toEmail = sup ? sup.email : '';
   const fromName = currentUser;
+  const isCaparol = sup && sup.id === 'Caparol';
+
+  // Save to history
+  history.unshift({id:Date.now(),placer:currentUser,leverantor:sup?sup.name:'',datum:Date.now(),total:orderTotal(),artiklar:JSON.parse(JSON.stringify(order))});
+  saveHistory();
+
+  // Generate Excel for Caparol
+  if(isCaparol){ generateExcel(fromName); }
 
   // Build email body
   const rows = order.map(item => {
@@ -859,30 +869,44 @@ function sendOrder(){
     return row;
   }).join('\n\n');
 
+  const bodyText = isCaparol
+    ? 'Hej,\n\nHär kommer vår order, se bifogad Excel-fil.\n\nMed vänliga hälsningar\n' + fromName + '\nKeller & Glenn Färgbutik'
+    : 'Hej,\n\nHär kommer vår order:\n\n─────────────────────────────────\n' + rows + '\n─────────────────────────────────\n\nMed vänliga hälsningar\n' + fromName + '\nKeller & Glenn Färgbutik';
+
   const subject = encodeURIComponent('Beställning från Keller & Glenn Färgbutik');
-  const body = encodeURIComponent(
-    'Hej,\n\n' +
-    'Här kommer vår order:\n\n' +
-    '─────────────────────────────────\n' +
-    rows + '\n' +
-    '─────────────────────────────────\n\n' +
-    'Med vänliga hälsningar\n' +
-    fromName + '\n' +
-    'Keller & Glenn Färgbutik'
-  );
+  const body = encodeURIComponent(bodyText);
 
-  // Save to history
-  history.unshift({id:Date.now(),placer:currentUser,leverantor:sup?sup.name:'',datum:Date.now(),total:orderTotal(),artiklar:JSON.parse(JSON.stringify(order))});
-  saveHistory();
+  // Open mail after Excel has downloaded
+  setTimeout(()=>{
+    window.location.href = 'mailto:' + toEmail + '?from=butiken@keller-glenn.se&subject=' + subject + '&body=' + body;
+  }, isCaparol ? 1500 : 0);
 
-  // Open email client
-  window.location.href = 'mailto:' + toEmail + '?from=butiken@keller-glenn.se&subject=' + subject + '&body=' + body;
-
-  // Clear order after short delay
+  // Clear order
   setTimeout(()=>{
     order=[]; saveOrder(); updateProgress(); updateBadge(); renderOrder();
-    notify('✓ E-post öppnad!','success');
-  }, 500);
+    notify(isCaparol ? '✓ Excel nedladdad — bifoga i mailet!' : '✓ E-post öppnad!','success');
+  }, isCaparol ? 2000 : 500);
+}
+
+function generateExcel(fromName){
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('sv-SE');
+  const wsData = [];
+  wsData.push(['Beställning — Keller & Glenn Färgbutik']);
+  wsData.push(['Datum:', dateStr]);
+  wsData.push(['Beställare:', fromName]);
+  wsData.push(['Leverantör:', 'Caparol / DAW Nordic']);
+  wsData.push([]);
+  wsData.push(['Artikelnummer', 'Artikelnamn', 'Kulör', 'Antal']);
+  order.forEach(item => {
+    wsData.push([item.artikelnummer, item.artikelnamn, item.kulor || '', item.antal]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:16},{wch:45},{wch:14},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Beställning');
+  const filename = 'Bestallning_Caparol_' + dateStr.replace(/-/g,'') + '.xlsx';
+  XLSX.writeFile(wb, filename);
 }
 
 function clearOrder(){
