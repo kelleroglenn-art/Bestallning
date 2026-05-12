@@ -715,7 +715,7 @@ function manualLookup(){
   if(!val) return;
   const p=lookup(val);
   if(p){ showProduct(p); notify('Artikel hittad ✓','success'); }
-  else { notify('Artikel hittades inte','warning'); document.getElementById('product-card').style.display='none'; }
+  else { openNewArticle(document.getElementById('manual-input').value.trim()); document.getElementById('product-card').style.display='none'; }
 }
 
 // ═══════════════════════════════
@@ -1063,7 +1063,7 @@ function startScanner(){
             showProduct(p); stopScanner();
             notify('✓ ' + p.artikelnamn.substring(0,32), 'success');
           } else {
-            notify('Okänd kod: ' + code, 'warning');
+            stopScanner(); openNewArticle(code);
           }
         }
       }
@@ -1119,5 +1119,40 @@ function notify(msg,type){
   clearTimeout(ntimer); ntimer=setTimeout(()=>el.className='',3000);
 }
 </script>
+
+<!-- NEW ARTICLE MODAL -->
+<div id="new-article-overlay" onclick="if(event.target===this)closeNewArticle()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:700;display:none;align-items:flex-end;justify-content:center;padding:0">
+  <div style="background:var(--panel);border-top:2px solid var(--orange);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;animation:slideUp .25s ease">
+    <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--orange);margin-bottom:4px;letter-spacing:.08em">OKÄND STRECKKOD</div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:16px">Lägg till ny artikel</div>
+    <div style="margin-bottom:10px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Streckkod</div>
+      <input id="na-barcode" type="text" inputmode="numeric" style="width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--muted);font-family:var(--mono);font-size:15px;padding:11px 12px;outline:none">
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Artikelnummer</div>
+      <input id="na-artnr" type="text" inputmode="numeric" style="width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:15px;padding:11px 12px;outline:none">
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Artikelnamn</div>
+      <input id="na-name" type="text" style="width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:15px;padding:11px 12px;outline:none">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Pris (kr)</div>
+        <input id="na-price" type="number" inputmode="decimal" step="0.01" style="width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:15px;padding:11px 12px;outline:none">
+      </div>
+      <div style="flex:1">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Min antal</div>
+        <input id="na-min" type="number" inputmode="numeric" min="1" value="1" style="width:100%;background:var(--bg);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:15px;padding:11px 12px;outline:none">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeNewArticle()" style="flex:1;padding:14px;border-radius:10px;background:none;border:2px solid var(--border);color:var(--muted);font-family:var(--sans);font-size:16px;font-weight:700;cursor:pointer">AVBRYT</button>
+      <button onclick="saveNewArticle()" style="flex:2;padding:14px;border-radius:10px;background:var(--orange);border:none;color:#000;font-family:var(--sans);font-size:16px;font-weight:700;cursor:pointer">SPARA & LÄGG TILL</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
