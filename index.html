@@ -639,6 +639,17 @@ function tryStart(){
   if(!currentSupplier){ notify('Välj en leverantör','warning'); return; }
   currentUser = name;
   // Switch to app
+  // Check if there are orders from a different supplier
+  if(order.length > 0 && currentSupplier) {
+    const oldSupplier = order[0].leverantor || '';
+    if(oldSupplier && oldSupplier !== currentSupplier.id) {
+      if(!confirm('Du har ' + order.length + ' artikel(ar) från ' + oldSupplier + ' i ordern.
+Vill du rensa ordern och börja ny order för ' + currentSupplier.name + '?')) {
+        return;
+      }
+      order = []; saveOrder();
+    }
+  }
   document.getElementById('screen-start').classList.remove('active');
   document.getElementById('screen-app').classList.add('active');
   document.getElementById('header-title').textContent = currentSupplier.name.toUpperCase();
