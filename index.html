@@ -34,6 +34,28 @@
 .kulor-input{flex:1;background:var(--bg);border:2px solid var(--orange);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:16px;padding:10px 12px;outline:none}
 .kulor-input-wrap button{background:var(--orange);border:none;border-radius:10px;color:#000;font-family:var(--mono);font-size:14px;font-weight:700;padding:10px 16px;cursor:pointer;white-space:nowrap}
 
+
+/* mass edit */
+.mass-edit-bar{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin:10px 16px 0}
+.mass-edit-title{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.1em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.mass-edit-title button{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0}
+.mass-edit-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.mass-edit-row select,.mass-edit-row input{background:var(--bg);border:2px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:14px;padding:8px 10px;outline:none}
+.mass-edit-row select{flex:1}
+.mass-edit-row input{width:90px}
+.mass-type-btn{background:var(--bg);border:2px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--mono);font-size:14px;padding:8px 14px;cursor:pointer}
+.mass-type-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mass-preview{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:8px;min-height:16px}
+.mass-apply-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-family:var(--sans);font-size:16px;font-weight:700;cursor:pointer}
+.mass-apply-btn:active{opacity:.85}
+
+/* db checkboxes */
+.db-item-check{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.db-item-check.checked{background:var(--accent);border-color:var(--accent);color:#fff;font-size:14px}
+.db-select-all{font-family:var(--mono);font-size:11px;color:var(--accent);cursor:pointer;padding:4px 0;display:inline-block}
+.mass-edit-mode .db-item{border-color:var(--border)}
+.mass-edit-mode .db-item.selected{border-color:var(--accent);background:rgba(91,155,248,.07)}
+
 </style>
 <title>Beställningsapp</title>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
@@ -535,10 +557,36 @@ header{background:var(--panel);border-bottom:1px solid var(--border);padding:14p
 <!-- DB -->
 <div class="view" id="view-db">
   <div class="view-header">
-    <h2>DATABAS — <span id="db-supplier-label"></span></h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin-bottom:0">DATABAS — <span id="db-supplier-label"></span></h2>
+      <div style="display:flex;gap:6px">
+        <button onclick="toggleMassEdit()" id="mass-edit-btn" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 10px;cursor:pointer;white-space:nowrap">✏ PRISER</button>
+        <button onclick="openNewArticle('')" style="background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:22px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
+      </div>
+    </div>
     <input class="search-input" type="search" id="db-search" placeholder="Sök artikel..." oninput="renderDB()">
+    <div id="db-select-row" style="display:none;padding-top:8px;display:none">
+      <span class="db-select-all" onclick="toggleSelectAll()">☐ Välj alla</span>
+      <span id="db-selected-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:12px"></span>
+    </div>
   </div>
-  <div class="db-list" id="db-list"></div>
+  <div id="mass-edit-panel" style="display:none">
+  <div class="mass-edit-bar">
+    <div class="mass-edit-title">
+      <span>MASSUPPDATERA PRISER</span>
+      <button onclick="toggleMassEdit()">✕</button>
+    </div>
+    <div class="mass-edit-row">
+      <button class="mass-type-btn active" id="btn-pct" onclick="setMassType('pct')">%</button>
+      <button class="mass-type-btn" id="btn-kr" onclick="setMassType('kr')">KR</button>
+      <input type="number" id="mass-value" placeholder="t.ex. 5" step="0.1" oninput="updateMassPreview()">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--muted)" id="mass-unit">%</span>
+    </div>
+    <div class="mass-preview" id="mass-preview"></div>
+    <button class="mass-apply-btn" onclick="applyMassEdit()">UPPDATERA MARKERADE PRISER</button>
+  </div>
+</div>
+<div class="db-list" id="db-list"></div>
 </div>
 
 </div><!-- /screen-app -->
@@ -987,17 +1035,33 @@ function reloadOrder(id){
 // ═══════════════════════════════
 // DB VIEW
 // ═══════════════════════════════
+let massEditMode = false;
+let selectedItems = new Set();
+let massType = 'pct';
+
 function renderDB(){
   const q=(document.getElementById('db-search')?.value||'').toLowerCase();
   const supId=currentSupplier?currentSupplier.id:null;
   const filtered=db.filter(p=>{
     if(supId && p.leverantor!==supId) return false;
-    return !q||p.artikelnamn.toLowerCase().includes(q)||p.artikelnummer.includes(q)||p.streckkod.includes(q);
+    return !q||p.artikelnamn.toLowerCase().includes(q)||p.artikelnummer.includes(q)||(p.streckkod||'').includes(q);
   });
   const list=document.getElementById('db-list');
   if(filtered.length===0){ list.innerHTML='<div style="color:var(--muted);font-size:15px;padding:40px;text-align:center">Inga resultat</div>'; return; }
-  list.innerHTML=filtered.slice(0,200).map(p=>{
+  list.innerHTML=filtered.slice(0,300).map(p=>{
     const idx=db.indexOf(p);
+    const isSelected = selectedItems.has(idx);
+    if(massEditMode){
+      return `<div class="db-item ${isSelected?'selected':''}" onclick="toggleItem(${idx})">
+        <div class="db-item-check ${isSelected?'checked':''}">${isSelected?'✓':''}</div>
+        <div class="db-item-info">
+          <div class="db-item-name">${p.artikelnamn}</div>
+          <div class="db-item-meta">Art.nr ${p.artikelnummer}</div>
+          ${p.minAntal>1?'<div class="db-item-min">⚡ Min '+p.minAntal+' st</div>':''}
+        </div>
+        <div class="db-item-price">${fmt(p.inkopspris)}</div>
+      </div>`;
+    }
     return `<div class="db-item" onclick="selectFromDB(${idx})">
       <div class="db-item-info">
         <div class="db-item-name">${p.artikelnamn}</div>
@@ -1010,6 +1074,7 @@ function renderDB(){
       </div>
     </div>`;
   }).join('');
+  updateSelectedCount();
 }
 
 function selectFromDB(idx){ showProduct(db[idx]); setTab('scan',document.getElementById('tab-scan')); }
@@ -1073,7 +1138,7 @@ function startScanner(){
             showProduct(p); stopScanner();
             notify('✓ ' + p.artikelnamn.substring(0,32), 'success');
           } else {
-            stopScanner(); openNewArticle(code);
+            stopScanner(); setTimeout(()=>openNewArticle(code), 300);
           }
         }
       }
@@ -1127,6 +1192,134 @@ function notify(msg,type){
   const el=document.getElementById('notification');
   el.textContent=msg; el.className='show '+(type||'info');
   clearTimeout(ntimer); ntimer=setTimeout(()=>el.className='',3000);
+}
+
+// ═══════════════════════════════
+// NEW ARTICLE
+// ═══════════════════════════════
+function openNewArticle(barcode){
+  document.getElementById('na-barcode').value = barcode || '';
+  document.getElementById('na-artnr').value = '';
+  document.getElementById('na-name').value = '';
+  document.getElementById('na-price').value = '';
+  document.getElementById('na-min').value = '1';
+  document.getElementById('na-artnr').style.borderColor = 'var(--border)';
+  document.getElementById('na-name').style.borderColor = 'var(--border)';
+  document.getElementById('na-price').style.borderColor = 'var(--border)';
+  document.getElementById('new-article-overlay').style.display = 'flex';
+  setTimeout(()=>document.getElementById('na-artnr').focus(), 150);
+}
+function closeNewArticle(){
+  document.getElementById('new-article-overlay').style.display = 'none';
+}
+function saveNewArticle(){
+  const barcode = document.getElementById('na-barcode').value.trim();
+  const artnr   = document.getElementById('na-artnr').value.trim();
+  const name    = document.getElementById('na-name').value.trim();
+  const price   = parseFloat(document.getElementById('na-price').value) || 0;
+  const min     = parseInt(document.getElementById('na-min').value) || 1;
+  document.getElementById('na-artnr').style.borderColor = artnr  ? 'var(--border)' : 'var(--red)';
+  document.getElementById('na-name').style.borderColor  = name   ? 'var(--border)' : 'var(--red)';
+  document.getElementById('na-price').style.borderColor = price  ? 'var(--border)' : 'var(--red)';
+  if(!artnr || !name || !price) return;
+  const newProduct = {
+    artikelnummer: artnr, artikelnamn: name, streckkod: barcode,
+    inkopspris: price, storlekskategori: 'other', minAntal: min,
+    leverantor: currentSupplier ? currentSupplier.id : ''
+  };
+  db.push(newProduct);
+  saveDB(); buildIndex(); closeNewArticle();
+  notify('Artikel tillagd i databasen!', 'success');
+  if(barcode) showProduct(newProduct); else renderDB();
+}
+
+// ═══════════════════════════════
+// MASS EDIT
+// ═══════════════════════════════
+function toggleMassEdit(){
+  massEditMode = !massEditMode;
+  selectedItems.clear();
+  document.getElementById('mass-edit-panel').style.display = massEditMode ? 'block' : 'none';
+  document.getElementById('db-select-row').style.display = massEditMode ? 'block' : 'none';
+  document.getElementById('mass-edit-btn').style.background = massEditMode ? 'var(--accent)' : 'var(--panel2)';
+  document.getElementById('mass-edit-btn').style.color = massEditMode ? '#fff' : 'var(--muted)';
+  document.getElementById('mass-preview').textContent = '';
+  renderDB();
+}
+
+function toggleItem(idx){
+  if(selectedItems.has(idx)) selectedItems.delete(idx);
+  else selectedItems.add(idx);
+  updateSelectedCount();
+  updateMassPreview();
+  renderDB();
+}
+
+function toggleSelectAll(){
+  const q=(document.getElementById('db-search')?.value||'').toLowerCase();
+  const supId=currentSupplier?currentSupplier.id:null;
+  const filtered=db.filter(p=>{
+    if(supId && p.leverantor!==supId) return false;
+    return !q||p.artikelnamn.toLowerCase().includes(q)||p.artikelnummer.includes(q)||(p.streckkod||'').includes(q);
+  });
+  const allSelected = filtered.every(p=>selectedItems.has(db.indexOf(p)));
+  if(allSelected){
+    filtered.forEach(p=>selectedItems.delete(db.indexOf(p)));
+  } else {
+    filtered.forEach(p=>selectedItems.add(db.indexOf(p)));
+  }
+  updateSelectedCount();
+  updateMassPreview();
+  renderDB();
+}
+
+function updateSelectedCount(){
+  const el = document.getElementById('db-selected-count');
+  const sa = document.querySelector('.db-select-all');
+  if(el) el.textContent = selectedItems.size > 0 ? selectedItems.size + ' valda' : '';
+  if(sa) sa.textContent = selectedItems.size > 0 ? '☑ Välj alla' : '☐ Välj alla';
+}
+
+function setMassType(type){
+  massType = type;
+  document.getElementById('btn-pct').classList.toggle('active', type==='pct');
+  document.getElementById('btn-kr').classList.toggle('active', type==='kr');
+  document.getElementById('mass-unit').textContent = type==='pct' ? '%' : 'kr';
+  updateMassPreview();
+}
+
+function updateMassPreview(){
+  const val = parseFloat(document.getElementById('mass-value').value) || 0;
+  const count = selectedItems.size;
+  if(!count || !val){ document.getElementById('mass-preview').textContent = count ? count+' artiklar valda' : ''; return; }
+  let totalChange = 0;
+  selectedItems.forEach(idx=>{
+    const p = db[idx];
+    if(massType==='pct') totalChange += p.inkopspris * val/100;
+    else totalChange += val;
+  });
+  const avg = totalChange/count;
+  document.getElementById('mass-preview').textContent =
+    count + ' artiklar · snittändring ' + (avg>=0?'+':'') + avg.toLocaleString('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' kr';
+}
+
+function applyMassEdit(){
+  const val = parseFloat(document.getElementById('mass-value').value) || 0;
+  if(!val){ notify('Ange ett värde','warning'); return; }
+  if(selectedItems.size === 0){ notify('Välj minst en artikel','warning'); return; }
+  if(!confirm('Uppdatera priser på ' + selectedItems.size + ' artiklar?')) return;
+  selectedItems.forEach(idx=>{
+    const p = db[idx];
+    if(massType==='pct') p.inkopspris = Math.round((p.inkopspris * (1 + val/100)) * 100)/100;
+    else p.inkopspris = Math.round((p.inkopspris + val) * 100)/100;
+  });
+  saveDB();
+  selectedItems.clear();
+  updateMassPreview();
+  renderDB();
+  notify('✓ ' + selectedItems.size + ' priser uppdaterade!', 'success');
+  // Reset count display
+  document.getElementById('db-selected-count').textContent = '';
 }
 </script>
 
