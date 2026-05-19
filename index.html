@@ -619,7 +619,7 @@ function initSuppliers(){
       <div class="supplier-check">✓</div>
     </button>`).join('');
 }
-initSuppliers();
+document.addEventListener("DOMContentLoaded", initSuppliers);
 
 function selectSupplier(id){
   currentSupplier = SUPPLIERS.find(s=>s.id===id);
@@ -643,8 +643,7 @@ function tryStart(){
   if(order.length > 0 && currentSupplier) {
     const oldSupplier = order[0].leverantor || '';
     if(oldSupplier && oldSupplier !== currentSupplier.id) {
-      if(!confirm('Du har ' + order.length + ' artikel(ar) från ' + oldSupplier + ' i ordern.
-Vill du rensa ordern och börja ny order för ' + currentSupplier.name + '?')) {
+      if(!confirm('Du har ' + order.length + ' artikel(ar) från ' + oldSupplier + ' i ordern.\nVill du rensa ordern och börja ny order för ' + currentSupplier.name + '?')) {
         return;
       }
       order = []; saveOrder();
@@ -1121,7 +1120,7 @@ function cycleTheme(){
 }
 
 // Apply on load
-applyTheme(currentTheme);
+document.addEventListener("DOMContentLoaded", ()=>applyTheme(currentTheme));
 
 let ntimer;
 function notify(msg,type){
